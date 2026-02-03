@@ -1,29 +1,130 @@
 /**
  * Local development server for testing the API.
- * Uses Hono's built-in serve function for local development.
+ * Uses Hono with Bun for local development.
+ * 
+ * This follows Hono best practices:
+ * - Global error handling with onError
+ * - Custom 404 handling with notFound
+ * - Logger middleware for development
+ * - HTTPException for structured errors
+ * - Proper Bun.serve configuration
  */
-import { serve } from "bun";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { logger } from "hono/logger";
+import { prettyJSON } from "hono/pretty-json";
+import { secureHeaders } from "hono/secure-headers";
 import { stream } from "hono/streaming";
+import { HTTPException } from "hono/http-exception";
 import { Embeddings } from "./rag/embeddings.js";
 import { DocsStore } from "./rag/store-upstash.js";
 import { Retriever } from "./rag/retriever-upstash.js";
 import { checkRateLimit, getClientIp } from "./rag/ratelimit.js";
+import { indexDocs, verifyGitHubSignature, isMainBranchPush } from "./rag/indexer.js";
 
 const MAX_MESSAGE_LENGTH = 2000;
 
+// Create Hono app with base path
 const app = new Hono();
 
-// CORS middleware for all routes
-app.use("*", cors());
+// =============================================================================
+// Middleware Stack (order matters)
+// =============================================================================
+
+// Logger middleware - logs all requests in development
+app.use("*", logger());
+
+// CORS middleware - restrict origins via ALLOWED_ORIGINS env var (comma-separated)
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",").map((o) => o.trim()) ?? [];
+app.use(
+  "*",
+  cors({
+    origin: (origin) => {
+      if (!origin || allowedOrigins.length === 0) return origin ?? "*";
+      return allowedOrigins.includes(origin) ? origin : null;
+    },
+  })
+);
+
+// Pretty JSON middleware - formats JSON responses in development
+app.use("*", prettyJSON());
+
+// Secure headers middleware - adds security headers
+app.use("*", secureHeaders());
+
+// =============================================================================
+// Global Error Handler
+// =============================================================================
+
+app.onError((err, c) => {
+  console.error(`[Error] ${err.message}`, err.stack);
+
+  // Handle HTTPException (structured errors)
+  if (err instanceof HTTPException) {
+    return c.json(
+      {
+        error: err.message,
+        status: err.status,
+      },
+      err.status
+    );
+  }
+
+  // Handle other errors
+  return c.json(
+    {
+      error: "Internal Server Error",
+      message: process.env.NODE_ENV === "development" ? err.message : undefined,
+    },
+    500
+  );
+});
+
+// =============================================================================
+// Custom 404 Handler
+// =============================================================================
+
+app.notFound((c) => {
+  return c.json(
+    {
+      error: "Not Found",
+      message: `The endpoint ${c.req.method} ${c.req.path} does not exist`,
+      availableEndpoints: {
+        "GET /": "Home page with interactive UI",
+        "GET /health": "Health check endpoint",
+        "POST /chat": "Chat endpoint with streaming response",
+      },
+    },
+    404
+  );
+});
+
+// =============================================================================
+// Routes
+// =============================================================================
 
 // Favicon handler (prevents 404)
 app.get("/favicon.ico", (c) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">⚖️</text></svg>`;
-  c.header("Content-Type", "image/svg+xml");
-  c.header("Cache-Control", "public, max-age=86400");
-  return c.body(svg);
+  return c.body(svg, 200, {
+    "Content-Type": "image/svg+xml",
+    "Cache-Control": "public, max-age=86400",
+  });
+});
+
+// Health check endpoint
+app.get("/health", async (c) => {
+  try {
+    const store = new DocsStore();
+    const count = await store.count();
+    return c.json({ ok: true, chunks: count, mode: "upstash-vector" });
+  } catch (err) {
+    console.error("Health check error:", err);
+    return c.json(
+      { ok: false, error: "Failed to connect to vector store" },
+      500
+    );
+  }
 });
 
 // Home page with interactive UI
@@ -353,18 +454,6 @@ app.get("/", async (c) => {
   return c.html(html);
 });
 
-// Health check endpoint
-app.get("/health", async (c) => {
-  try {
-    const store = new DocsStore();
-    const count = await store.count();
-    return c.json({ ok: true, chunks: count, mode: "upstash-vector" });
-  } catch (err) {
-    console.error("Health check error:", err);
-    return c.json({ ok: false, error: "Failed to connect to vector store" }, 500);
-  }
-});
-
 // Chat endpoint with streaming
 app.post("/chat", async (c) => {
   // Rate limiting
@@ -385,14 +474,18 @@ app.post("/chat", async (c) => {
         "Retry-After",
         Math.ceil((rateLimitResult.reset - Date.now()) / 1000).toString()
       );
-      return c.json({ error: "Too many requests. Please try again later." }, 429);
+      throw new HTTPException(429, {
+        message: "Too many requests. Please try again later.",
+      });
     }
   }
 
   // Validate environment
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    return c.json({ error: "Server configuration error" }, 500);
+    throw new HTTPException(500, {
+      message: "Server configuration error",
+    });
   }
 
   // Parse body
@@ -401,131 +494,333 @@ app.post("/chat", async (c) => {
     const body = await c.req.json();
     message = body?.message;
   } catch {
-    return c.json({ error: "Invalid JSON" }, 400);
+    throw new HTTPException(400, {
+      message: "Invalid JSON",
+    });
   }
 
   if (!message || typeof message !== "string") {
-    return c.json({ error: "message required" }, 400);
+    throw new HTTPException(400, {
+      message: "message required",
+    });
   }
 
   const trimmedMessage = message.trim();
   if (!trimmedMessage) {
-    return c.json({ error: "message required" }, 400);
+    throw new HTTPException(400, {
+      message: "message required",
+    });
   }
 
   if (trimmedMessage.length > MAX_MESSAGE_LENGTH) {
-    return c.json(
-      { error: `Message too long (max ${MAX_MESSAGE_LENGTH} characters)` },
-      400
+    throw new HTTPException(400, {
+      message: `Message too long (max ${MAX_MESSAGE_LENGTH} characters)`,
+    });
+  }
+
+  // Initialize RAG components
+  const embeddings = new Embeddings(apiKey);
+  const store = new DocsStore();
+  const retriever = new Retriever(store, embeddings);
+
+  // Retrieve relevant docs
+  const results = await retriever.retrieve(trimmedMessage, 8);
+
+  if (results.length === 0) {
+    return c.text(
+      "I couldn't find relevant documentation excerpts for that question. Try rephrasing or search the docs."
     );
   }
 
-  try {
-    // Initialize RAG components
-    const embeddings = new Embeddings(apiKey);
-    const store = new DocsStore();
-    const retriever = new Retriever(store, embeddings);
+  // Build context from retrieved chunks
+  const context = results
+    .map(
+      (result) =>
+        `[${result.chunk.title}](${result.chunk.url})\n${result.chunk.content.slice(0, 1200)}`
+    )
+    .join("\n\n---\n\n");
 
-    // Retrieve relevant docs
-    const results = await retriever.retrieve(trimmedMessage, 8);
+  const systemPrompt =
+    "You are a helpful assistant for OpenClaw documentation. " +
+    "Answer only from the provided documentation excerpts. " +
+    "If the answer is not in the excerpts, say so and suggest checking the docs. " +
+    "Cite sources by name or URL when relevant.\n\nDocumentation excerpts:\n" +
+    context;
 
-    if (results.length === 0) {
-      return c.text(
-        "I couldn't find relevant documentation excerpts for that question. Try rephrasing or search the docs."
-      );
+  // Stream response from OpenAI
+  return stream(c, async (s) => {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        stream: true,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: trimmedMessage },
+        ],
+      }),
+    });
+
+    if (!response.ok || !response.body) {
+      const errorText = await response.text();
+      throw new HTTPException(502, {
+        message: `OpenAI API error: ${response.status}`,
+      });
     }
 
-    // Build context from retrieved chunks
-    const context = results
-      .map(
-        (result) =>
-          `[${result.chunk.title}](${result.chunk.url})\n${result.chunk.content.slice(0, 1200)}`
-      )
-      .join("\n\n---\n\n");
+    const decoder = new TextDecoder();
+    let buffer = "";
 
-    const systemPrompt =
-      "You are a helpful assistant for OpenClaw documentation. " +
-      "Answer only from the provided documentation excerpts. " +
-      "If the answer is not in the excerpts, say so and suggest checking the docs. " +
-      "Cite sources by name or URL when relevant.\n\nDocumentation excerpts:\n" +
-      context;
+    for await (const chunk of response.body as AsyncIterable<Uint8Array>) {
+      buffer += decoder.decode(chunk, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
 
-    // Stream response from OpenAI
-    return stream(c, async (s) => {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          stream: true,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: trimmedMessage },
-          ],
-        }),
-      });
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) continue;
+        const data = trimmed.slice(5).trim();
+        if (data === "[DONE]") return;
 
-      if (!response.ok || !response.body) {
-        const errorText = await response.text();
-        throw new Error(`OpenAI ${response.status}: ${errorText}`);
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      for await (const chunk of response.body as AsyncIterable<Uint8Array>) {
-        buffer += decoder.decode(chunk, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith("data:")) continue;
-          const data = trimmed.slice(5).trim();
-          if (data === "[DONE]") return;
-
-          try {
-            const json = JSON.parse(data);
-            const delta = json.choices?.[0]?.delta?.content;
-            if (delta) {
-              await s.write(delta);
-            }
-          } catch {
-            // Ignore malformed SSE lines
+        try {
+          const json = JSON.parse(data);
+          const delta = json.choices?.[0]?.delta?.content;
+          if (delta) {
+            await s.write(delta);
           }
+        } catch {
+          // Ignore malformed SSE lines
         }
       }
+    }
+  });
+});
+
+// =============================================================================
+// Webhook Routes (for GitHub docs update)
+// =============================================================================
+
+// Store indexing status
+let indexingStatus = {
+  isIndexing: false,
+  lastIndexed: null as Date | null,
+  lastResult: null as {
+    success: boolean;
+    pagesProcessed: number;
+    chunksCreated: number;
+    duration: number;
+    errors: string[];
+  } | null,
+};
+
+// GET /api/webhook - Status endpoint
+app.get("/api/webhook", (c) => {
+  return c.json({
+    status: "ok",
+    webhook: "GitHub docs update webhook",
+    isIndexing: indexingStatus.isIndexing,
+    lastIndexed: indexingStatus.lastIndexed?.toISOString() || null,
+    lastResult: indexingStatus.lastResult,
+  });
+});
+
+// POST /api/reindex - Manual re-index endpoint (development only)
+app.post("/api/reindex", async (c) => {
+  const isDevelopment = !process.env.NODE_ENV || process.env.NODE_ENV === "development";
+  
+  if (!isDevelopment) {
+    throw new HTTPException(403, {
+      message: "Manual re-indexing is only available in development mode",
     });
-  } catch (err) {
-    console.error("Chat error:", err);
-    return c.json({ error: "Internal server error" }, 500);
+  }
+
+  // Prevent concurrent indexing
+  if (indexingStatus.isIndexing) {
+    return c.json({
+      status: "skipped",
+      message: "Indexing already in progress",
+    });
+  }
+
+  console.log("Starting manual documentation re-index...");
+  indexingStatus.isIndexing = true;
+
+  try {
+    const result = await indexDocs();
+
+    indexingStatus.lastIndexed = new Date();
+    indexingStatus.lastResult = result;
+    indexingStatus.isIndexing = false;
+
+    if (result.success) {
+      console.log(`Indexing complete: ${result.chunksCreated} chunks from ${result.pagesProcessed} pages`);
+      return c.json({
+        status: "success",
+        message: "Documentation re-indexed successfully",
+        result: {
+          pagesProcessed: result.pagesProcessed,
+          chunksCreated: result.chunksCreated,
+          duration: result.duration,
+        },
+      });
+    } else {
+      console.error("Indexing failed:", result.errors);
+      return c.json({
+        status: "error",
+        message: "Indexing failed",
+        errors: result.errors,
+      }, 500);
+    }
+  } catch (error) {
+    indexingStatus.isIndexing = false;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Indexing error:", error);
+    throw new HTTPException(500, {
+      message: `Indexing failed: ${errorMessage}`,
+    });
   }
 });
 
-// 404 for unknown routes
-app.all("*", (c) => {
-  return c.json(
-    {
-      error: "Not Found",
-      message: "The requested endpoint does not exist",
-      endpoints: {
-        home: "GET /",
-        health: "GET /health",
-        chat: "POST /chat",
-      },
-    },
-    404
-  );
+// POST /api/webhook - GitHub webhook handler
+app.post("/api/webhook", async (c) => {
+  const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET;
+  const isDevelopment = !process.env.NODE_ENV || process.env.NODE_ENV === "development";
+
+  // For development, allow triggering without secret
+  if (!webhookSecret && !isDevelopment) {
+    console.error("GITHUB_WEBHOOK_SECRET not configured");
+    throw new HTTPException(500, {
+      message: "Webhook not configured",
+    });
+  }
+
+  // Get raw body for signature verification
+  const rawBody = await c.req.text();
+  const signature = c.req.header("X-Hub-Signature-256") ?? null;
+  const event = c.req.header("X-GitHub-Event") ?? null;
+  const deliveryId = c.req.header("X-GitHub-Delivery");
+
+  console.log(`Webhook received: event=${event}, delivery=${deliveryId}`);
+
+  // Verify signature (skip in development when no secret is configured)
+  if (webhookSecret) {
+    if (!verifyGitHubSignature(rawBody, signature, webhookSecret)) {
+      console.error("Invalid webhook signature");
+      throw new HTTPException(401, {
+        message: "Invalid signature",
+      });
+    }
+  } else if (!isDevelopment) {
+    // Already handled above, but double-check
+    throw new HTTPException(500, { message: "Webhook not configured" });
+  } else {
+    console.log("Skipping signature verification (development mode, no secret)");
+  }
+
+  // Parse payload
+  let payload: unknown;
+  try {
+    payload = rawBody ? JSON.parse(rawBody) : {};
+  } catch {
+    throw new HTTPException(400, {
+      message: "Invalid JSON payload",
+    });
+  }
+
+  // Handle ping event
+  if (event === "ping") {
+    console.log("Webhook ping received");
+    return c.json({
+      status: "ok",
+      message: "Webhook configured successfully",
+    });
+  }
+
+  // For development, allow manual trigger without push event check
+  if (!isDevelopment && !isMainBranchPush(event, payload)) {
+    console.log(`Ignoring event: ${event} (not a main branch push)`);
+    return c.json({
+      status: "ignored",
+      message: "Not a main branch push event",
+    });
+  }
+
+  // Prevent concurrent indexing
+  if (indexingStatus.isIndexing) {
+    console.log("Indexing already in progress, skipping");
+    return c.json({
+      status: "skipped",
+      message: "Indexing already in progress",
+    });
+  }
+
+  // Trigger indexing
+  console.log("Starting documentation re-index...");
+  indexingStatus.isIndexing = true;
+
+  try {
+    const result = await indexDocs();
+
+    indexingStatus.lastIndexed = new Date();
+    indexingStatus.lastResult = result;
+    indexingStatus.isIndexing = false;
+
+    if (result.success) {
+      console.log(`Indexing complete: ${result.chunksCreated} chunks from ${result.pagesProcessed} pages`);
+      return c.json({
+        status: "success",
+        message: "Documentation re-indexed successfully",
+        result: {
+          pagesProcessed: result.pagesProcessed,
+          chunksCreated: result.chunksCreated,
+          duration: result.duration,
+        },
+      });
+    } else {
+      console.error("Indexing failed:", result.errors);
+      return c.json({
+        status: "error",
+        message: "Indexing failed",
+        errors: result.errors,
+      }, 500);
+    }
+  } catch (error) {
+    indexingStatus.isIndexing = false;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Indexing error:", error);
+    throw new HTTPException(500, {
+      message: `Indexing failed: ${errorMessage}`,
+    });
+  }
 });
+
+// =============================================================================
+// Server Configuration
+// =============================================================================
 
 const port = parseInt(process.env.PORT || "3000", 10);
 
-console.log(`Starting dev server on http://localhost:${port}`);
+console.log(`
+╔══════════════════════════════════════════════════════════════╗
+║                    OpenClaw Chat API                         ║
+║                  Development Server                          ║
+╠══════════════════════════════════════════════════════════════╣
+║  Local:   http://localhost:${port.toString().padEnd(35)}║
+║  Mode:    ${(process.env.NODE_ENV || "development").padEnd(45)}║
+╚══════════════════════════════════════════════════════════════╝
+`);
 
-serve({
-  fetch: app.fetch,
+// Use Bun.serve with proper configuration
+export default {
   port,
-});
+  fetch: app.fetch,
+  // Enable request IP access for rate limiting
+  // Enable larger request bodies if needed
+  maxRequestBodySize: 1024 * 1024 * 10, // 10MB
+  // Increase idle timeout for long-running operations like indexing (max 255 seconds)
+  idleTimeout: 255,
+};

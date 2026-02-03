@@ -5,9 +5,17 @@
     {
       "src": "api/index.ts",
       "use": "@vercel/node"
+    },
+    {
+      "src": "api/webhook.ts",
+      "use": "@vercel/node"
     }
   ],
   "rewrites": [
+    {
+      "source": "/api/webhook",
+      "destination": "/api/webhook"
+    },
     {
       "source": "/(.*)",
       "destination": "/api/index"

@@ -1,11 +1,20 @@
 /**
  * Hono-based API for docs-chat.
  * Handles RAG-based question answering with streaming responses.
+ * 
+ * This follows Hono best practices:
+ * - Global error handling with onError
+ * - Custom 404 handling with notFound
+ * - HTTPException for structured errors
+ * - Vercel adapter for serverless deployment
  */
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { prettyJSON } from "hono/pretty-json";
+import { secureHeaders } from "hono/secure-headers";
 import { stream } from "hono/streaming";
 import { handle } from "hono/vercel";
+import { HTTPException } from "hono/http-exception";
 import { Embeddings } from "../rag/embeddings.js";
 import { DocsStore } from "../rag/store-upstash.js";
 import { Retriever } from "../rag/retriever-upstash.js";
@@ -13,18 +22,103 @@ import { checkRateLimit, getClientIp } from "../rag/ratelimit.js";
 
 const MAX_MESSAGE_LENGTH = 2000;
 
-const app = new Hono().basePath("/");
+// Create Hono app
+const app = new Hono();
 
-// CORS middleware for all routes
-app.use("*", cors());
+// =============================================================================
+// Middleware Stack
+// =============================================================================
+
+// CORS middleware - restrict origins via ALLOWED_ORIGINS env var (comma-separated)
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",").map((o) => o.trim()) ?? [];
+app.use(
+  "*",
+  cors({
+    origin: (origin) => {
+      if (!origin || allowedOrigins.length === 0) return origin ?? "*";
+      return allowedOrigins.includes(origin) ? origin : null;
+    },
+  })
+);
+
+// Pretty JSON middleware - formats JSON responses
+app.use("*", prettyJSON());
+
+// Secure headers middleware - adds security headers
+app.use("*", secureHeaders());
+
+// =============================================================================
+// Global Error Handler
+// =============================================================================
+
+app.onError((err, c) => {
+  console.error(`[Error] ${err.message}`, err.stack);
+
+  // Handle HTTPException (structured errors)
+  if (err instanceof HTTPException) {
+    return c.json(
+      {
+        error: err.message,
+        status: err.status,
+      },
+      err.status
+    );
+  }
+
+  // Handle other errors
+  return c.json(
+    {
+      error: "Internal Server Error",
+    },
+    500
+  );
+});
+
+// =============================================================================
+// Custom 404 Handler
+// =============================================================================
+
+app.notFound((c) => {
+  return c.json(
+    {
+      error: "Not Found",
+      message: `The endpoint ${c.req.method} ${c.req.path} does not exist`,
+      availableEndpoints: {
+        "GET /": "Home page with interactive UI",
+        "GET /health": "Health check endpoint",
+        "POST /chat": "Chat endpoint with streaming response",
+      },
+    },
+    404
+  );
+});
+
+// =============================================================================
+// Routes
+// =============================================================================
 
 // Favicon handler (prevents 404)
 app.get("/favicon.ico", (c) => {
-  // Return a minimal SVG favicon
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">⚖️</text></svg>`;
-  c.header("Content-Type", "image/svg+xml");
-  c.header("Cache-Control", "public, max-age=86400");
-  return c.body(svg);
+  return c.body(svg, 200, {
+    "Content-Type": "image/svg+xml",
+    "Cache-Control": "public, max-age=86400",
+  });
+});
+
+// Health check endpoint
+app.get("/health", async (c) => {
+  try {
+    const store = new DocsStore();
+    const count = await store.count();
+    return c.json({ ok: true, chunks: count, mode: "upstash-vector" });
+  } catch (err) {
+    console.error("Health check error:", err);
+    return c.json(
+      { ok: false, error: "Failed to connect to vector store" },
+      500
+    );
+  }
 });
 
 // Home page with interactive UI
@@ -354,18 +448,6 @@ app.get("/", async (c) => {
   return c.html(html);
 });
 
-// Health check endpoint
-app.get("/health", async (c) => {
-  try {
-    const store = new DocsStore();
-    const count = await store.count();
-    return c.json({ ok: true, chunks: count, mode: "upstash-vector" });
-  } catch (err) {
-    console.error("Health check error:", err);
-    return c.json({ ok: false, error: "Failed to connect to vector store" }, 500);
-  }
-});
-
 // Chat endpoint with streaming
 app.post("/chat", async (c) => {
   // Rate limiting
@@ -386,14 +468,18 @@ app.post("/chat", async (c) => {
         "Retry-After",
         Math.ceil((rateLimitResult.reset - Date.now()) / 1000).toString()
       );
-      return c.json({ error: "Too many requests. Please try again later." }, 429);
+      throw new HTTPException(429, {
+        message: "Too many requests. Please try again later.",
+      });
     }
   }
 
   // Validate environment
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    return c.json({ error: "Server configuration error" }, 500);
+    throw new HTTPException(500, {
+      message: "Server configuration error",
+    });
   }
 
   // Parse body
@@ -402,127 +488,117 @@ app.post("/chat", async (c) => {
     const body = await c.req.json();
     message = body?.message;
   } catch {
-    return c.json({ error: "Invalid JSON" }, 400);
+    throw new HTTPException(400, {
+      message: "Invalid JSON",
+    });
   }
 
   if (!message || typeof message !== "string") {
-    return c.json({ error: "message required" }, 400);
+    throw new HTTPException(400, {
+      message: "message required",
+    });
   }
 
   const trimmedMessage = message.trim();
   if (!trimmedMessage) {
-    return c.json({ error: "message required" }, 400);
+    throw new HTTPException(400, {
+      message: "message required",
+    });
   }
 
   if (trimmedMessage.length > MAX_MESSAGE_LENGTH) {
-    return c.json(
-      { error: `Message too long (max ${MAX_MESSAGE_LENGTH} characters)` },
-      400
+    throw new HTTPException(400, {
+      message: `Message too long (max ${MAX_MESSAGE_LENGTH} characters)`,
+    });
+  }
+
+  // Initialize RAG components
+  const embeddings = new Embeddings(apiKey);
+  const store = new DocsStore();
+  const retriever = new Retriever(store, embeddings);
+
+  // Retrieve relevant docs
+  const results = await retriever.retrieve(trimmedMessage, 8);
+
+  if (results.length === 0) {
+    return c.text(
+      "I couldn't find relevant documentation excerpts for that question. Try rephrasing or search the docs."
     );
   }
 
-  try {
-    // Initialize RAG components
-    const embeddings = new Embeddings(apiKey);
-    const store = new DocsStore();
-    const retriever = new Retriever(store, embeddings);
+  // Build context from retrieved chunks
+  const context = results
+    .map(
+      (result) =>
+        `[${result.chunk.title}](${result.chunk.url})\n${result.chunk.content.slice(0, 1200)}`
+    )
+    .join("\n\n---\n\n");
 
-    // Retrieve relevant docs
-    const results = await retriever.retrieve(trimmedMessage, 8);
+  const systemPrompt =
+    "You are a helpful assistant for OpenClaw documentation. " +
+    "Answer only from the provided documentation excerpts. " +
+    "If the answer is not in the excerpts, say so and suggest checking the docs. " +
+    "Cite sources by name or URL when relevant.\n\nDocumentation excerpts:\n" +
+    context;
 
-    if (results.length === 0) {
-      return c.text(
-        "I couldn't find relevant documentation excerpts for that question. Try rephrasing or search the docs."
-      );
+  // Stream response from OpenAI
+  return stream(c, async (s) => {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        stream: true,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: trimmedMessage },
+        ],
+      }),
+    });
+
+    if (!response.ok || !response.body) {
+      const errorText = await response.text();
+      throw new HTTPException(502, {
+        message: `OpenAI API error: ${response.status}`,
+      });
     }
 
-    // Build context from retrieved chunks
-    const context = results
-      .map(
-        (result) =>
-          `[${result.chunk.title}](${result.chunk.url})\n${result.chunk.content.slice(0, 1200)}`
-      )
-      .join("\n\n---\n\n");
+    const decoder = new TextDecoder();
+    let buffer = "";
 
-    const systemPrompt =
-      "You are a helpful assistant for OpenClaw documentation. " +
-      "Answer only from the provided documentation excerpts. " +
-      "If the answer is not in the excerpts, say so and suggest checking the docs. " +
-      "Cite sources by name or URL when relevant.\n\nDocumentation excerpts:\n" +
-      context;
+    for await (const chunk of response.body as AsyncIterable<Uint8Array>) {
+      buffer += decoder.decode(chunk, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
 
-    // Stream response from OpenAI
-    return stream(c, async (s) => {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          stream: true,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: trimmedMessage },
-          ],
-        }),
-      });
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) continue;
+        const data = trimmed.slice(5).trim();
+        if (data === "[DONE]") return;
 
-      if (!response.ok || !response.body) {
-        const errorText = await response.text();
-        throw new Error(`OpenAI ${response.status}: ${errorText}`);
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      for await (const chunk of response.body as AsyncIterable<Uint8Array>) {
-        buffer += decoder.decode(chunk, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith("data:")) continue;
-          const data = trimmed.slice(5).trim();
-          if (data === "[DONE]") return;
-
-          try {
-            const json = JSON.parse(data);
-            const delta = json.choices?.[0]?.delta?.content;
-            if (delta) {
-              await s.write(delta);
-            }
-          } catch {
-            // Ignore malformed SSE lines
+        try {
+          const json = JSON.parse(data);
+          const delta = json.choices?.[0]?.delta?.content;
+          if (delta) {
+            await s.write(delta);
           }
+        } catch {
+          // Ignore malformed SSE lines
         }
       }
-    });
-  } catch (err) {
-    console.error("Chat error:", err);
-    return c.json({ error: "Internal server error" }, 500);
-  }
+    }
+  });
 });
 
-// 404 for unknown routes
-app.all("*", (c) => {
-  return c.json(
-    {
-      error: "Not Found",
-      message: "The requested endpoint does not exist",
-      endpoints: {
-        home: "GET /",
-        health: "GET /health",
-        chat: "POST /chat",
-      },
-    },
-    404
-  );
-});
+// =============================================================================
+// Vercel Export
+// =============================================================================
 
-// Export handlers for Vercel
+// Export handlers for Vercel serverless functions
 const handler = handle(app);
 export const GET = handler;
 export const POST = handler;

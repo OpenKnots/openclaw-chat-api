@@ -15,6 +15,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun run --watch dev-server.ts",
+    "start": "bun run dev-server.ts",
     "build:index": "bun build-vector-index.ts",
     "deploy": "vercel"
   },
