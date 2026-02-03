@@ -103,9 +103,13 @@ app.notFound((c) => {
 // Routes
 // =============================================================================
 
-// Favicon handler (prevents 404)
+// Favicon handler - Knot logo
 app.get("/favicon.ico", (c) => {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">⚖️</text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="white" stroke-width="4">
+    <rect width="100" height="100" fill="#0a0a0a"/>
+    <circle cx="50" cy="50" r="35" stroke-width="3"/>
+    <path d="M28 50 Q50 25 72 50 Q50 75 28 50" stroke-width="2.5"/>
+  </svg>`;
   return c.body(svg, 200, {
     "Content-Type": "image/svg+xml",
     "Cache-Control": "public, max-age=86400",
@@ -127,7 +131,7 @@ app.get("/health", async (c) => {
   }
 });
 
-// Home page with interactive UI
+// Home page with interactive UI - Glassmorphic black/white design with markdown rendering
 app.get("/", async (c) => {
   let status = { ok: false, chunks: 0, mode: "upstash-vector" };
   try {
@@ -143,271 +147,590 @@ app.get("/", async (c) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OpenClaw Chat API</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>">
+  <title>OpenClaw | Documentation Assistant</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='none' stroke='white' stroke-width='4'/><path d='M30 50 Q50 30 70 50 Q50 70 30 50' fill='none' stroke='white' stroke-width='3'/></svg>">
+  <!-- Marked.js for Markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg-primary: #0a0a0a;
+      --bg-secondary: #111111;
+      --glass-bg: rgba(255, 255, 255, 0.03);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-hover: rgba(255, 255, 255, 0.06);
+      --text-primary: #fafafa;
+      --text-secondary: #a1a1a1;
+      --text-muted: #666666;
+      --accent: #ffffff;
+      --accent-dim: rgba(255, 255, 255, 0.1);
+      --success: #4ade80;
+      --error: #f87171;
+      --radius: 16px;
+      --radius-sm: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      font-size: 16px;
+    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-primary);
       min-height: 100vh;
-      color: #e4e4e7;
+      color: var(--text-primary);
       line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
+
+    /* Subtle grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image: 
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      z-index: -1;
+    }
+
     .container {
-      max-width: 800px;
+      max-width: 720px;
       margin: 0 auto;
-      padding: 2rem;
+      padding: 3rem 1.5rem;
     }
+
+    /* Header */
     header {
       text-align: center;
-      padding: 3rem 0 2rem;
+      margin-bottom: 3rem;
     }
+
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 64px;
+      height: 64px;
+      margin-bottom: 1.5rem;
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(10px);
+    }
+
+    .logo svg {
+      width: 32px;
+      height: 32px;
+    }
+
     h1 {
-      font-size: 2.5rem;
-      font-weight: 700;
-      background: linear-gradient(90deg, #60a5fa, #a78bfa);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: -0.03em;
       margin-bottom: 0.5rem;
+      color: var(--text-primary);
     }
+
     .subtitle {
-      color: #a1a1aa;
-      font-size: 1.1rem;
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      font-weight: 400;
     }
-    .status-card {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 12px;
-      padding: 1.5rem;
-      margin: 2rem 0;
-    }
-    .status-header {
+
+    /* Status Bar */
+    .status-bar {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 1rem;
+      justify-content: center;
+      gap: 2rem;
+      padding: 1rem 1.5rem;
+      margin-bottom: 2rem;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      backdrop-filter: blur(10px);
     }
-    .status-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: ${status.ok ? "#22c55e" : "#ef4444"};
-      box-shadow: 0 0 8px ${status.ok ? "#22c55e" : "#ef4444"};
-    }
-    .status-text {
-      font-weight: 600;
-      color: ${status.ok ? "#22c55e" : "#ef4444"};
-    }
-    .status-details {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 1rem;
-    }
-    .stat {
-      background: rgba(255, 255, 255, 0.03);
-      padding: 1rem;
-      border-radius: 8px;
-      text-align: center;
-    }
-    .stat-value {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: #60a5fa;
-    }
-    .stat-label {
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
       font-size: 0.85rem;
-      color: #71717a;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
     }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: ${status.ok ? "var(--success)" : "var(--error)"};
+      box-shadow: 0 0 8px ${status.ok ? "var(--success)" : "var(--error)"};
+    }
+
+    .status-label {
+      color: var(--text-muted);
+    }
+
+    .status-value {
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    /* Glass Card */
+    .glass-card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      backdrop-filter: blur(10px);
+      overflow: hidden;
+    }
+
+    /* Chat Section */
     .chat-section {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 12px;
+      margin-bottom: 2rem;
+    }
+
+    .chat-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    .chat-header h2 {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .chat-body {
       padding: 1.5rem;
-      margin: 2rem 0;
     }
-    .chat-section h2 {
-      font-size: 1.25rem;
-      margin-bottom: 1rem;
-      color: #e4e4e7;
-    }
+
     .chat-form {
       display: flex;
       gap: 0.75rem;
     }
+
     .chat-input {
       flex: 1;
       padding: 0.875rem 1rem;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 8px;
-      background: rgba(0, 0, 0, 0.3);
-      color: #e4e4e7;
-      font-size: 1rem;
-      transition: border-color 0.2s;
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      background: rgba(0, 0, 0, 0.4);
+      color: var(--text-primary);
+      font-size: 0.95rem;
+      font-family: inherit;
+      transition: all 0.2s ease;
     }
+
     .chat-input:focus {
       outline: none;
-      border-color: #60a5fa;
+      border-color: rgba(255, 255, 255, 0.2);
+      background: rgba(0, 0, 0, 0.6);
     }
+
     .chat-input::placeholder {
-      color: #71717a;
+      color: var(--text-muted);
     }
+
     .chat-btn {
       padding: 0.875rem 1.5rem;
-      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      background: var(--accent);
       border: none;
-      border-radius: 8px;
-      color: white;
+      border-radius: var(--radius-sm);
+      color: var(--bg-primary);
+      font-size: 0.9rem;
       font-weight: 600;
+      font-family: inherit;
       cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
+      transition: all 0.2s ease;
     }
+
     .chat-btn:hover {
+      opacity: 0.9;
       transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
     }
+
+    .chat-btn:active {
+      transform: translateY(0);
+    }
+
     .chat-btn:disabled {
-      opacity: 0.6;
+      opacity: 0.5;
       cursor: not-allowed;
       transform: none;
     }
+
+    /* Response Area with Markdown */
     .response-area {
-      margin-top: 1rem;
-      padding: 1rem;
+      margin-top: 1.5rem;
+      padding: 1.25rem 1.5rem;
       background: rgba(0, 0, 0, 0.3);
-      border-radius: 8px;
-      min-height: 100px;
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
       display: none;
-      white-space: pre-wrap;
-      font-family: inherit;
+      min-height: 120px;
+      max-height: 500px;
+      overflow-y: auto;
     }
+
     .response-area.visible {
       display: block;
     }
-    .endpoints {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 12px;
-      padding: 1.5rem;
+
+    .response-area.loading::after {
+      content: '';
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid var(--text-muted);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-left: 0.5rem;
     }
-    .endpoints h2 {
-      font-size: 1.25rem;
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Markdown Styles */
+    .markdown-body {
+      font-size: 0.95rem;
+      line-height: 1.7;
+      color: var(--text-primary);
+    }
+
+    .markdown-body h1, .markdown-body h2, .markdown-body h3 {
+      margin-top: 1.5rem;
+      margin-bottom: 0.75rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .markdown-body h1 { font-size: 1.5rem; }
+    .markdown-body h2 { font-size: 1.25rem; }
+    .markdown-body h3 { font-size: 1.1rem; }
+
+    .markdown-body p {
       margin-bottom: 1rem;
     }
+
+    .markdown-body ul, .markdown-body ol {
+      margin-bottom: 1rem;
+      padding-left: 1.5rem;
+    }
+
+    .markdown-body li {
+      margin-bottom: 0.5rem;
+    }
+
+    .markdown-body a {
+      color: var(--text-primary);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      text-decoration-color: var(--text-muted);
+      transition: text-decoration-color 0.2s;
+    }
+
+    .markdown-body a:hover {
+      text-decoration-color: var(--text-primary);
+    }
+
+    .markdown-body code {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.875em;
+      padding: 0.2em 0.4em;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+    }
+
+    .markdown-body pre {
+      margin: 1rem 0;
+      padding: 1rem;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      overflow-x: auto;
+    }
+
+    .markdown-body pre code {
+      padding: 0;
+      background: none;
+      font-size: 0.85rem;
+    }
+
+    .markdown-body blockquote {
+      margin: 1rem 0;
+      padding-left: 1rem;
+      border-left: 2px solid var(--glass-border);
+      color: var(--text-secondary);
+    }
+
+    .markdown-body hr {
+      margin: 1.5rem 0;
+      border: none;
+      border-top: 1px solid var(--glass-border);
+    }
+
+    /* Endpoints Section */
+    .endpoints-section {
+      margin-bottom: 2rem;
+    }
+
+    .endpoint-list {
+      padding: 0.5rem 0;
+    }
+
     .endpoint {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       gap: 1rem;
-      padding: 1rem 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--glass-border);
+      transition: background 0.2s;
     }
+
     .endpoint:last-child {
       border-bottom: none;
-      padding-bottom: 0;
     }
+
+    .endpoint:hover {
+      background: var(--glass-hover);
+    }
+
     .method {
       padding: 0.25rem 0.5rem;
       border-radius: 4px;
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       font-weight: 700;
+      font-family: 'SF Mono', monospace;
       text-transform: uppercase;
-      flex-shrink: 0;
+      letter-spacing: 0.02em;
     }
-    .method.get { background: #22c55e; color: #052e16; }
-    .method.post { background: #3b82f6; color: #1e3a8a; }
-    .endpoint-info h3 {
-      font-size: 1rem;
-      font-family: 'SF Mono', Monaco, monospace;
-      color: #e4e4e7;
-      margin-bottom: 0.25rem;
+
+    .method.get {
+      background: rgba(74, 222, 128, 0.15);
+      color: var(--success);
     }
-    .endpoint-info p {
+
+    .method.post {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-primary);
+    }
+
+    .endpoint-path {
+      font-family: 'SF Mono', monospace;
       font-size: 0.9rem;
-      color: #a1a1aa;
+      color: var(--text-primary);
     }
+
+    .endpoint-desc {
+      flex: 1;
+      text-align: right;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* Footer */
     footer {
       text-align: center;
-      padding: 2rem;
-      color: #71717a;
-      font-size: 0.85rem;
+      padding: 2rem 0;
+      border-top: 1px solid var(--glass-border);
     }
-    footer a {
-      color: #60a5fa;
+
+    .footer-links {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .footer-links a {
+      color: var(--text-secondary);
       text-decoration: none;
+      font-size: 0.85rem;
+      transition: color 0.2s;
     }
-    footer a:hover {
-      text-decoration: underline;
+
+    .footer-links a:hover {
+      color: var(--text-primary);
+    }
+
+    .footer-brand {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .footer-brand a {
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .footer-brand a:hover {
+      color: var(--text-secondary);
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--glass-border);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      .container {
+        padding: 2rem 1rem;
+      }
+
+      .status-bar {
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+
+      .chat-form {
+        flex-direction: column;
+      }
+
+      .endpoint {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+      }
+
+      .endpoint-desc {
+        text-align: left;
+      }
     }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
-      <h1>OpenClaw Chat API</h1>
-      <p class="subtitle">RAG-powered documentation assistant</p>
+      <div class="logo">
+        <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="4">
+          <circle cx="50" cy="50" r="40"/>
+          <path d="M30 50 Q50 25 70 50 Q50 75 30 50" stroke-width="3"/>
+        </svg>
+      </div>
+      <h1>OpenClaw</h1>
+      <p class="subtitle">Documentation Assistant</p>
     </header>
 
-    <div class="status-card">
-      <div class="status-header">
+    <div class="status-bar">
+      <div class="status-item">
         <div class="status-dot"></div>
-        <span class="status-text">${status.ok ? "Operational" : "Service Unavailable"}</span>
+        <span class="status-value">${status.ok ? "Online" : "Offline"}</span>
       </div>
-      <div class="status-details">
-        <div class="stat">
-          <div class="stat-value">${status.chunks.toLocaleString()}</div>
-          <div class="stat-label">Doc Chunks</div>
-        </div>
-        <div class="stat">
-          <div class="stat-value">${status.mode.replace("upstash-", "").toUpperCase()}</div>
-          <div class="stat-label">Storage</div>
-        </div>
-        <div class="stat">
-          <div class="stat-value">GPT-4o</div>
-          <div class="stat-label">Model</div>
+      <div class="status-item">
+        <span class="status-label">Indexed</span>
+        <span class="status-value">${status.chunks.toLocaleString()} chunks</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">Model</span>
+        <span class="status-value">GPT-4o</span>
+      </div>
+    </div>
+
+    <div class="glass-card chat-section">
+      <div class="chat-header">
+        <h2>Ask a Question</h2>
+      </div>
+      <div class="chat-body">
+        <form class="chat-form" id="chatForm">
+          <input 
+            type="text" 
+            class="chat-input" 
+            id="messageInput" 
+            placeholder="How do I get started with OpenClaw?" 
+            maxlength="${MAX_MESSAGE_LENGTH}" 
+            autocomplete="off"
+            required
+          >
+          <button type="submit" class="chat-btn" id="submitBtn">Ask</button>
+        </form>
+        <div class="response-area" id="response">
+          <div class="markdown-body" id="markdownContent"></div>
         </div>
       </div>
     </div>
 
-    <div class="chat-section">
-      <h2>Try It Out</h2>
-      <form class="chat-form" id="chatForm">
-        <input type="text" class="chat-input" id="messageInput" placeholder="Ask a question about OpenClaw docs..." maxlength="${MAX_MESSAGE_LENGTH}" required>
-        <button type="submit" class="chat-btn" id="submitBtn">Send</button>
-      </form>
-      <div class="response-area" id="response"></div>
-    </div>
-
-    <div class="endpoints">
-      <h2>API Endpoints</h2>
-      <div class="endpoint">
-        <span class="method get">GET</span>
-        <div class="endpoint-info">
-          <h3>/health</h3>
-          <p>Health check endpoint. Returns API status and vector store count.</p>
-        </div>
+    <div class="glass-card endpoints-section">
+      <div class="chat-header">
+        <h2>API Reference</h2>
       </div>
-      <div class="endpoint">
-        <span class="method post">POST</span>
-        <div class="endpoint-info">
-          <h3>/chat</h3>
-          <p>Send a message and receive a streaming response. Body: <code>{ "message": "your question" }</code></p>
+      <div class="endpoint-list">
+        <div class="endpoint">
+          <span class="method get">GET</span>
+          <span class="endpoint-path">/health</span>
+          <span class="endpoint-desc">Health check & stats</span>
+        </div>
+        <div class="endpoint">
+          <span class="method post">POST</span>
+          <span class="endpoint-path">/chat</span>
+          <span class="endpoint-desc">Streaming chat response</span>
+        </div>
+        <div class="endpoint">
+          <span class="method post">POST</span>
+          <span class="endpoint-path">/api/webhook</span>
+          <span class="endpoint-desc">GitHub docs webhook</span>
         </div>
       </div>
     </div>
 
     <footer>
-      <p>Built by <a href="https://github.com/OpenKnots" target="_blank">OpenKnot AI</a> | <a href="https://github.com/OpenKnots/openclaw-chat-api" target="_blank">View on GitHub</a></p>
+      <div class="footer-links">
+        <a href="https://docs.openclaw.ai" target="_blank">Documentation</a>
+        <a href="https://github.com/OpenKnots/openclaw-chat-api" target="_blank">GitHub</a>
+        <a href="/health">API Status</a>
+      </div>
+      <p class="footer-brand">Threaded by <a href="https://github.com/OpenKnots" target="_blank">OpenKnot</a></p>
     </footer>
   </div>
 
   <script>
+    // Configure marked options
+    marked.setOptions({
+      breaks: true,
+      gfm: true,
+      headerIds: false,
+      mangle: false
+    });
+
     const form = document.getElementById('chatForm');
     const input = document.getElementById('messageInput');
-    const response = document.getElementById('response');
+    const responseArea = document.getElementById('response');
+    const markdownContent = document.getElementById('markdownContent');
     const submitBtn = document.getElementById('submitBtn');
+
+    let rawText = '';
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -415,9 +738,10 @@ app.get("/", async (c) => {
       if (!message) return;
 
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Sending...';
-      response.classList.add('visible');
-      response.textContent = '';
+      submitBtn.textContent = 'Thinking...';
+      responseArea.classList.add('visible', 'loading');
+      markdownContent.innerHTML = '';
+      rawText = '';
 
       try {
         const res = await fetch('/chat', {
@@ -426,9 +750,11 @@ app.get("/", async (c) => {
           body: JSON.stringify({ message })
         });
 
+        responseArea.classList.remove('loading');
+
         if (!res.ok) {
           const err = await res.json();
-          response.textContent = 'Error: ' + (err.error || 'Unknown error');
+          markdownContent.innerHTML = '<p style="color: var(--error);">Error: ' + (err.error || 'Unknown error') + '</p>';
           return;
         }
 
@@ -438,13 +764,30 @@ app.get("/", async (c) => {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          response.textContent += decoder.decode(value, { stream: true });
+          
+          rawText += decoder.decode(value, { stream: true });
+          // Render markdown as it streams
+          markdownContent.innerHTML = marked.parse(rawText);
+          // Auto-scroll to bottom
+          responseArea.scrollTop = responseArea.scrollHeight;
         }
+
+        // Final render
+        markdownContent.innerHTML = marked.parse(rawText);
       } catch (err) {
-        response.textContent = 'Error: ' + err.message;
+        responseArea.classList.remove('loading');
+        markdownContent.innerHTML = '<p style="color: var(--error);">Error: ' + err.message + '</p>';
       } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Send';
+        submitBtn.textContent = 'Ask';
+      }
+    });
+
+    // Handle Enter key
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        form.dispatchEvent(new Event('submit'));
       }
     });
   </script>
