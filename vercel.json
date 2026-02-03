@@ -1,5 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "rewrites": [
+    { "source": "/chat", "destination": "/api/chat" },
+    { "source": "/health", "destination": "/api/health" },
+    { "source": "/webhook", "destination": "/api/webhook" }
+  ]
 }
