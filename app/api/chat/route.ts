@@ -12,11 +12,26 @@ export const runtime = "edge";
 
 const MAX_MESSAGE_LENGTH = 2000;
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "https://claw.openknot.ai",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+// Handle preflight requests
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: CORS_HEADERS,
+  });
+}
+
 function jsonResponse(data: object, status = 200, headers: Record<string, string> = {}) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       "Content-Type": "application/json",
+      ...CORS_HEADERS,
       ...headers,
     },
   });
@@ -109,7 +124,7 @@ export async function POST(request: NextRequest) {
     if (results.length === 0) {
       return new Response(
         "I couldn't find relevant documentation excerpts for that question. Try rephrasing or search the docs.",
-        { headers: { "Content-Type": "text/plain", ...rateLimitHeaders } }
+        { headers: { "Content-Type": "text/plain", ...CORS_HEADERS, ...rateLimitHeaders } }
       );
     }
 
@@ -188,6 +203,7 @@ export async function POST(request: NextRequest) {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
         "Transfer-Encoding": "chunked",
+        ...CORS_HEADERS,
         ...rateLimitHeaders,
       },
     });
