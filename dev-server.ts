@@ -90,9 +90,10 @@ app.notFound((c) => {
       error: "Not Found",
       message: `The endpoint ${c.req.method} ${c.req.path} does not exist`,
       availableEndpoints: {
-        "GET /": "Home page with interactive UI",
-        "GET /health": "Health check endpoint",
-        "POST /chat": "Chat endpoint with streaming response",
+        "GET /api/": "Home page with interactive UI",
+        "GET /api/health": "Health check endpoint",
+        "POST /api/chat": "Chat endpoint with streaming response",
+        "POST /api/webhook": "GitHub docs webhook",
       },
     },
     404
@@ -117,7 +118,7 @@ app.get("/favicon.ico", (c) => {
 });
 
 // Health check endpoint
-app.get("/health", async (c) => {
+app.get("/api/health", async (c) => {
   try {
     const store = new DocsStore();
     const count = await store.count();
@@ -132,7 +133,7 @@ app.get("/health", async (c) => {
 });
 
 // Home page with interactive UI - Glassmorphic black/white design with markdown rendering
-app.get("/", async (c) => {
+app.get("/api/", async (c) => {
   let status = { ok: false, chunks: 0, mode: "upstash-vector" };
   try {
     const store = new DocsStore();
@@ -694,12 +695,12 @@ app.get("/", async (c) => {
       <div class="endpoint-list">
         <div class="endpoint">
           <span class="method get">GET</span>
-          <span class="endpoint-path">/health</span>
+          <span class="endpoint-path">/api/health</span>
           <span class="endpoint-desc">Health check & stats</span>
         </div>
         <div class="endpoint">
           <span class="method post">POST</span>
-          <span class="endpoint-path">/chat</span>
+          <span class="endpoint-path">/api/chat</span>
           <span class="endpoint-desc">Streaming chat response</span>
         </div>
         <div class="endpoint">
@@ -714,7 +715,7 @@ app.get("/", async (c) => {
       <div class="footer-links">
         <a href="https://docs.openclaw.ai" target="_blank">Documentation</a>
         <a href="https://github.com/OpenKnots/openclaw-chat-api" target="_blank">GitHub</a>
-        <a href="/health">API Status</a>
+        <a href="/api/health">API Status</a>
       </div>
       <p class="footer-brand">Threaded by <a href="https://github.com/OpenKnots" target="_blank">OpenKnot</a></p>
     </footer>
@@ -749,7 +750,7 @@ app.get("/", async (c) => {
       rawText = '';
 
       try {
-        const res = await fetch('/chat', {
+        const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message })
@@ -803,7 +804,7 @@ app.get("/", async (c) => {
 });
 
 // Chat endpoint with streaming
-app.post("/chat", async (c) => {
+app.post("/api/chat", async (c) => {
   // Rate limiting
   const clientIp = getClientIp(
     Object.fromEntries(

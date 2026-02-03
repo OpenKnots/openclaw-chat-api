@@ -85,7 +85,7 @@ app.notFound((c) => {
       error: "Not Found",
       message: `The endpoint ${c.req.method} ${c.req.path} does not exist`,
       availableEndpoints: {
-        "GET /": "Home page with interactive UI",
+        "GET /api/": "Home page with interactive UI",
         "GET /api/health": "Health check endpoint",
         "POST /api/chat": "Chat endpoint with streaming response",
         "POST /api/webhook": "GitHub docs webhook",
@@ -112,8 +112,21 @@ app.get("/favicon.ico", (c) => {
   });
 });
 
+// API root - redirect to home or show available endpoints
+api.get("/", (c) => {
+  return c.json({
+    name: "OpenClaw API",
+    version: "1.0.0",
+    endpoints: {
+      "GET /api/health": "Health check & stats",
+      "POST /api/chat": "Streaming chat response",
+      "POST /api/webhook": "GitHub docs webhook",
+    },
+  });
+});
+
 // Health check endpoint
-api.get("/health", async (c) => {
+api.get("/api/health", async (c) => {
   try {
     const store = new DocsStore();
     const count = await store.count();
@@ -128,7 +141,7 @@ api.get("/health", async (c) => {
 });
 
 // Home page with interactive UI - Glassmorphic black/white design with markdown rendering
-app.get("/", async (c) => {
+app.get("/api/", async (c) => {
   let status = { ok: false, chunks: 0, mode: "upstash-vector" };
   try {
     const store = new DocsStore();
@@ -202,7 +215,7 @@ app.get("/", async (c) => {
 });
 
 // Chat endpoint with streaming
-api.post("/chat", async (c) => {
+api.post("/api/chat", async (c) => {
   // Rate limiting
   const clientIp = getClientIp(
     Object.fromEntries(

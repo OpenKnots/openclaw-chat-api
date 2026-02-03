@@ -8,6 +8,7 @@
         "@upstash/ratelimit": "^2.0.8",
         "@upstash/redis": "^1.36.2",
         "@upstash/vector": "^1.2.2",
+        "@vercel/analytics": "^1.6.1",
         "hono": "^4.11.7",
         "openai": "^6.17.0",
       },
@@ -132,6 +133,8 @@
     "@upstash/redis": ["@upstash/redis@1.36.2", "", { "dependencies": { "uncrypto": "^0.1.3" } }, "sha512-C0Yt8hc12vLaQYRG1fMci8iPrLtnTdbJG0HR5T8vKnvEP/1RdMMblsOJs5/jp0JXZJ1oSzMnQz4J9EVezNpI6A=="],
 
     "@upstash/vector": ["@upstash/vector@1.2.2", "", {}, "sha512-ptQ9xnxtKqmpNK52PCcHCszlPOLxIBfjsv7ty8RoF95pkjctS9rSjTQ3Pl9bx5VFbpDj+0dMXw88WLt6swDkgQ=="],
+
+    "@vercel/analytics": ["@vercel/analytics@1.6.1", "", { "peerDependencies": { "@remix-run/react": "^2", "@sveltejs/kit": "^1 || ^2", "next": ">= 13", "react": "^18 || ^19 || ^19.0.0-rc", "svelte": ">= 4", "vue": "^3", "vue-router": "^4" }, "optionalPeers": ["@remix-run/react", "@sveltejs/kit", "next", "react", "svelte", "vue", "vue-router"] }, "sha512-oH9He/bEM+6oKlv3chWuOOcp8Y6fo6/PSro8hEkgCW3pu9/OiCXiUpRUogDh3Fs3LH2sosDrx8CxeOLBEE+afg=="],
 
     "@vercel/build-utils": ["@vercel/build-utils@13.2.16", "", {}, "sha512-5i6q9xXhDaZ75bQ/VMMCyeXtRY1HTJXj47ch3BEN42BgNdvFoDSL0eQVMzi80yRjyTvJ1bzGpn1A1K5aswLZVQ=="],
 
