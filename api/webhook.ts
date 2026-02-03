@@ -63,7 +63,7 @@ app.post("/", async (c) => {
   console.log(`Webhook received: event=${event}, delivery=${deliveryId}`);
 
   // Verify signature
-  if (!verifyGitHubSignature(rawBody, signature, webhookSecret)) {
+  if (!await verifyGitHubSignature(rawBody, signature, webhookSecret)) {
     console.error("Invalid webhook signature");
     throw new HTTPException(401, {
       message: "Invalid signature",

@@ -5,7 +5,42 @@
  */
 import { Embeddings } from "./embeddings.js";
 import { DocsStore, DocsChunk } from "./store-upstash.js";
-import crypto from "crypto";
+
+// Web Crypto API helpers for Edge Runtime compatibility
+async function sha256Hex(data: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const dataBuffer = encoder.encode(data);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", dataBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function hmacSha256Hex(key: string, data: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const keyBuffer = encoder.encode(key);
+  const dataBuffer = encoder.encode(data);
+  
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    keyBuffer,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  
+  const signature = await crypto.subtle.sign("HMAC", cryptoKey, dataBuffer);
+  const hashArray = Array.from(new Uint8Array(signature));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
 
 const DOCS_BASE_URL = "https://docs.openclaw.ai";
 const LLMS_FULL_URL = `${DOCS_BASE_URL}/llms-full.txt`;
@@ -106,18 +141,18 @@ function cleanMarkdown(markdown: string): string {
  * Splits content into chunks suitable for embedding.
  * Uses a sliding window approach with overlap for context.
  */
-function chunkContent(
+async function chunkContent(
   page: DocPage,
   chunkSize: number = 1000,
   overlap: number = 200
-): DocsChunk[] {
+): Promise<DocsChunk[]> {
   const chunks: DocsChunk[] = [];
   const content = page.content;
 
   if (content.length <= chunkSize) {
     // Single chunk for short content
     chunks.push({
-      id: generateChunkId(page.url, 0),
+      id: await generateChunkId(page.url, 0),
       path: page.path,
       title: page.title,
       content: content,
@@ -146,14 +181,14 @@ function chunkContent(
       }
     }
 
-    const chunkContent = content.slice(start, end).trim();
+    const chunkText = content.slice(start, end).trim();
 
-    if (chunkContent.length > 50) {
+    if (chunkText.length > 50) {
       chunks.push({
-        id: generateChunkId(page.url, chunkIndex),
+        id: await generateChunkId(page.url, chunkIndex),
         path: page.path,
         title: `${page.title}${chunkIndex > 0 ? ` (Part ${chunkIndex + 1})` : ""}`,
-        content: chunkContent,
+        content: chunkText,
         url: page.url,
         vector: [],
       });
@@ -170,8 +205,8 @@ function chunkContent(
 /**
  * Generates a deterministic chunk ID based on URL and position.
  */
-function generateChunkId(url: string, index: number): string {
-  const hash = crypto.createHash("sha256").update(`${url}:${index}`).digest("hex");
+async function generateChunkId(url: string, index: number): Promise<string> {
+  const hash = await sha256Hex(`${url}:${index}`);
   return hash.slice(0, 16);
 }
 
@@ -221,7 +256,7 @@ export async function indexDocs(): Promise<IndexResult> {
     console.log("Chunking content...");
     const allChunks: DocsChunk[] = [];
     for (const page of pages) {
-      const chunks = chunkContent(page);
+      const chunks = await chunkContent(page);
       allChunks.push(...chunks);
     }
     console.log(`Created ${allChunks.length} chunks from ${pages.length} pages`);
@@ -268,28 +303,17 @@ export async function indexDocs(): Promise<IndexResult> {
 /**
  * Verifies GitHub webhook signature.
  */
-export function verifyGitHubSignature(
+export async function verifyGitHubSignature(
   payload: string,
   signature: string | null,
   secret: string
-): boolean {
+): Promise<boolean> {
   if (!signature) return false;
 
-  const expectedSignature = `sha256=${crypto
-    .createHmac("sha256", secret)
-    .update(payload)
-    .digest("hex")}`;
-
-  // Constant-time comparison to prevent timing attacks
   try {
-    const sigBuffer = new Uint8Array(Buffer.from(signature));
-    const expectedBuffer = new Uint8Array(Buffer.from(expectedSignature));
-
-    if (sigBuffer.length !== expectedBuffer.length) {
-      return false;
-    }
-
-    return crypto.timingSafeEqual(sigBuffer, expectedBuffer);
+    const expectedSignature = `sha256=${await hmacSha256Hex(secret, payload)}`;
+    // Constant-time comparison to prevent timing attacks
+    return timingSafeEqual(signature, expectedSignature);
   } catch {
     return false;
   }
