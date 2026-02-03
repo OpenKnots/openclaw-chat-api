@@ -43,7 +43,7 @@ export default async function Home() {
         </div>
         <div className="status-item">
           <span className="status-label">Model</span>
-          <span className="status-value">GPT-4o</span>
+          <span className="status-value">GPT-4.1 mini</span>
         </div>
       </div>
 

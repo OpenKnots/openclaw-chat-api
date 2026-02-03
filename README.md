@@ -21,7 +21,7 @@ This API serves as the backend for OpenClaw's docs chat widget. It uses RAG (Ret
 - **Deployment**: [Vercel](https://vercel.com) Edge Functions
 - **Vector Store**: [Upstash Vector](https://upstash.com/vector)
 - **Rate Limiting**: [Upstash Redis](https://upstash.com/redis)
-- **AI**: [OpenAI](https://openai.com) (gpt-4o-mini for chat, text-embedding-3-small for embeddings)
+- **AI**: [OpenAI](https://openai.com) (gpt-4.1-mini for chat, text-embedding-3-large for embeddings)
 - **Language**: TypeScript
 
 ## API Endpoints
@@ -66,14 +66,14 @@ cp .env.example .env
 
 ### Environment Variables
 
-| Variable                    | Required | Description                              |
-| --------------------------- | -------- | ---------------------------------------- |
-| `OPENAI_API_KEY`            | Yes      | OpenAI API key                           |
-| `UPSTASH_VECTOR_REST_URL`   | Yes      | Upstash Vector endpoint                  |
-| `UPSTASH_VECTOR_REST_TOKEN` | Yes      | Upstash Vector auth token                |
-| `UPSTASH_REDIS_REST_URL`    | Yes      | Upstash Redis endpoint (rate limiting)   |
-| `UPSTASH_REDIS_REST_TOKEN`  | Yes      | Upstash Redis auth token                 |
-| `GITHUB_WEBHOOK_SECRET`     | No       | Secret for GitHub webhook verification   |
+| Variable                    | Required | Description                            |
+| --------------------------- | -------- | -------------------------------------- |
+| `OPENAI_API_KEY`            | Yes      | OpenAI API key                         |
+| `UPSTASH_VECTOR_REST_URL`   | Yes      | Upstash Vector endpoint                |
+| `UPSTASH_VECTOR_REST_TOKEN` | Yes      | Upstash Vector auth token              |
+| `UPSTASH_REDIS_REST_URL`    | Yes      | Upstash Redis endpoint (rate limiting) |
+| `UPSTASH_REDIS_REST_TOKEN`  | Yes      | Upstash Redis auth token               |
+| `GITHUB_WEBHOOK_SECRET`     | No       | Secret for GitHub webhook verification |
 
 3. Build the vector index (indexes documentation into Upstash):
 
@@ -91,14 +91,14 @@ Runs locally at http://localhost:3000.
 
 ## Scripts
 
-| Script               | Description                            |
-| -------------------- | -------------------------------------- |
-| `bun run dev`        | Start development server               |
-| `bun run build`      | Build for production                   |
-| `bun run start`      | Start production server                |
-| `bun run lint`       | Run ESLint                             |
-| `bun run build:index`| Index documentation into vector store  |
-| `bun run deploy`     | Deploy to Vercel                       |
+| Script                | Description                           |
+| --------------------- | ------------------------------------- |
+| `bun run dev`         | Start development server              |
+| `bun run build`       | Build for production                  |
+| `bun run start`       | Start production server               |
+| `bun run lint`        | Run ESLint                            |
+| `bun run build:index` | Index documentation into vector store |
+| `bun run deploy`      | Deploy to Vercel                      |
 
 ## Deploy
 
