@@ -2,9 +2,11 @@
  * Documentation Indexer for OpenClaw docs.
  * Fetches documentation from docs.openclaw.ai/llms-full.txt,
  * chunks it, generates embeddings, and stores in Upstash Vector.
+ * Also builds BM25 inverted index for keyword search.
  */
 import { Embeddings } from "./embeddings";
 import { DocsStore, DocsChunk } from "./store-upstash";
+import { buildTermIndex, storeTermIndex } from "./bm25-searcher";
 
 // Web Crypto API helpers for Edge Runtime compatibility
 async function sha256Hex(data: string): Promise<string> {
@@ -56,6 +58,7 @@ interface IndexResult {
   success: boolean;
   pagesProcessed: number;
   chunksCreated: number;
+  uniqueTerms: number;
   errors: string[];
   duration: number;
 }
@@ -227,6 +230,7 @@ export async function indexDocs(): Promise<IndexResult> {
       success: false,
       pagesProcessed: 0,
       chunksCreated: 0,
+      uniqueTerms: 0,
       errors: ["OPENAI_API_KEY is required"],
       duration: Date.now() - startTime,
     };
@@ -245,6 +249,7 @@ export async function indexDocs(): Promise<IndexResult> {
         success: false,
         pagesProcessed: 0,
         chunksCreated: 0,
+        uniqueTerms: 0,
         errors: ["No documentation pages could be fetched from llms-full.txt"],
         duration: Date.now() - startTime,
       };
@@ -275,6 +280,20 @@ export async function indexDocs(): Promise<IndexResult> {
     console.log("Storing in vector database...");
     await store.replaceAll(allChunks);
 
+    // Build and store BM25 index for keyword search
+    console.log("Building BM25 index...");
+    const termIndex = buildTermIndex(
+      allChunks.map((chunk) => ({
+        id: chunk.id,
+        content: chunk.content,
+        title: chunk.title,
+      }))
+    );
+    await storeTermIndex(termIndex);
+    console.log(
+      `BM25 index built with ${termIndex.totalDocs} documents and ${termIndex.terms.size} unique terms`
+    );
+
     const duration = Date.now() - startTime;
     console.log(`Indexing complete in ${duration}ms`);
 
@@ -282,6 +301,7 @@ export async function indexDocs(): Promise<IndexResult> {
       success: true,
       pagesProcessed: pages.length,
       chunksCreated: allChunks.length,
+      uniqueTerms: termIndex.terms.size,
       errors,
       duration,
     };
@@ -294,6 +314,7 @@ export async function indexDocs(): Promise<IndexResult> {
       success: false,
       pagesProcessed: 0,
       chunksCreated: 0,
+      uniqueTerms: 0,
       errors,
       duration: Date.now() - startTime,
     };

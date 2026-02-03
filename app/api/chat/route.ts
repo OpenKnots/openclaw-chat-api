@@ -1,16 +1,27 @@
 /**
  * Chat Endpoint
- * Handles RAG-based question answering with streaming responses.
+ * Handles hybrid RAG-based question answering with streaming responses.
+ * Features: Multi-strategy retrieval, Cohere reranking, and observability.
  */
 import { NextRequest } from "next/server";
 import { Embeddings } from "@/rag/embeddings";
 import { DocsStore } from "@/rag/store-upstash";
 import { Retriever } from "@/rag/retriever-upstash";
 import { checkRateLimit, getClientIp } from "@/rag/ratelimit";
+import { classifyQuery, type ClassifiedQuery } from "@/rag/classifier";
+import { BM25Searcher, loadTermIndex } from "@/rag/bm25-searcher";
+import { reciprocalRankFusion, type FusedResult } from "@/rag/fusion";
+import { getReranker, type RerankResult } from "@/rag/reranker";
+import {
+  getObservabilityService,
+  generateQueryId,
+  type QueryLog,
+} from "@/rag/observability";
 
 export const runtime = "edge";
 
 const MAX_MESSAGE_LENGTH = 2000;
+const ENABLE_HYBRID = process.env.ENABLE_HYBRID_SEARCH === "true";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "https://claw.openknot.ai",
@@ -26,7 +37,11 @@ export async function OPTIONS() {
   });
 }
 
-function jsonResponse(data: object, status = 200, headers: Record<string, string> = {}) {
+function jsonResponse(
+  data: object,
+  status = 200,
+  headers: Record<string, string> = {}
+) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
@@ -37,7 +52,33 @@ function jsonResponse(data: object, status = 200, headers: Record<string, string
   });
 }
 
+// Enhanced system prompt for better answers
+function buildSystemPrompt(context: string): string {
+  return `You are an expert assistant for OpenClaw documentation.
+
+INSTRUCTIONS:
+1. Answer ONLY from the provided documentation excerpts
+2. If the answer is not in the excerpts, clearly state this
+3. Cite sources using [Source Title](URL) format
+4. For code examples, use the exact code from docs when available
+5. Be concise but complete
+6. If multiple approaches exist, mention the recommended one first
+
+CONFIDENCE:
+- If you're highly confident, answer directly
+- If partially confident, caveat with "Based on the available documentation..."
+- If not confident, say "I couldn't find specific documentation for this..."
+
+DOCUMENTATION EXCERPTS:
+${context}`;
+}
+
 export async function POST(request: NextRequest) {
+  const queryId = generateQueryId();
+  const startTime = Date.now();
+  let retrievalMs = 0;
+  let rerankMs = 0;
+
   try {
     // Rate limiting
     const headersObj: Record<string, string> = {};
@@ -50,7 +91,8 @@ export async function POST(request: NextRequest) {
     const rateLimitHeaders: Record<string, string> = {};
     if (rateLimitResult) {
       rateLimitHeaders["X-RateLimit-Limit"] = rateLimitResult.limit.toString();
-      rateLimitHeaders["X-RateLimit-Remaining"] = rateLimitResult.remaining.toString();
+      rateLimitHeaders["X-RateLimit-Remaining"] =
+        rateLimitResult.remaining.toString();
       rateLimitHeaders["X-RateLimit-Reset"] = rateLimitResult.reset.toString();
 
       if (!rateLimitResult.success) {
@@ -77,14 +119,27 @@ export async function POST(request: NextRequest) {
 
     // Parse body
     let message = "";
-    const ALLOWED_MODELS = ["gpt-5-nano", "gpt-4.1-nano", "gpt-4.1-mini", "gpt-4o-mini", "gpt-5-mini", "gpt-5.2"];
+    const ALLOWED_MODELS = [
+      "gpt-5-nano",
+      "gpt-4.1-nano",
+      "gpt-4.1-mini",
+      "gpt-4o-mini",
+      "gpt-5-mini",
+      "gpt-5.2",
+    ];
     const defaultModel = process.env.DEFAULT_CHAT_MODEL || "gpt-4o-mini";
-    let model = ALLOWED_MODELS.includes(defaultModel) ? defaultModel : "gpt-4o-mini";
-    
+    let model = ALLOWED_MODELS.includes(defaultModel)
+      ? defaultModel
+      : "gpt-4o-mini";
+
     try {
       const body = await request.json();
       message = body?.message;
-      if (body?.model && typeof body.model === "string" && ALLOWED_MODELS.includes(body.model)) {
+      if (
+        body?.model &&
+        typeof body.model === "string" &&
+        ALLOWED_MODELS.includes(body.model)
+      ) {
         model = body.model;
       }
     } catch {
@@ -114,58 +169,185 @@ export async function POST(request: NextRequest) {
 
     if (trimmedMessage.length > MAX_MESSAGE_LENGTH) {
       return jsonResponse(
-        { error: `Message too long (max ${MAX_MESSAGE_LENGTH} characters)`, status: 400 },
+        {
+          error: `Message too long (max ${MAX_MESSAGE_LENGTH} characters)`,
+          status: 400,
+        },
         400,
         rateLimitHeaders
       );
     }
+
+    // Classify query for optimal retrieval strategy
+    const classified: ClassifiedQuery = classifyQuery(trimmedMessage);
 
     // Initialize RAG components
     const embeddings = new Embeddings(apiKey);
     const store = new DocsStore();
     const retriever = new Retriever(store, embeddings);
 
-    // Retrieve relevant docs
-    const results = await retriever.retrieve(trimmedMessage, 8);
+    let finalResults: Array<{
+      id: string;
+      content: string;
+      title: string;
+      url: string;
+      score: number;
+    }> = [];
+    let topScores: number[] = [];
 
-    if (results.length === 0) {
+    const retrievalStart = Date.now();
+
+    if (ENABLE_HYBRID) {
+      // ===== HYBRID SEARCH PIPELINE =====
+
+      // Load BM25 index
+      const termIndex = await loadTermIndex();
+      const bm25Searcher = termIndex ? new BM25Searcher(termIndex) : null;
+
+      // Parallel retrieval based on strategy
+      let semanticResults = await retriever.retrieve(classified.expanded, 20);
+      let keywordResults: Array<{ id: string; score: number }> = [];
+
+      if (bm25Searcher && classified.strategy !== "semantic") {
+        const keywordQuery = classified.keywords.join(" ");
+        keywordResults = bm25Searcher.search(keywordQuery, 20);
+      }
+
+      retrievalMs = Date.now() - retrievalStart;
+
+      // Build chunk map for fusion
+      const chunkMap = new Map(
+        semanticResults.map((r) => [r.chunk.id, r.chunk])
+      );
+
+      // Fuse results using RRF
+      let fusedResults: FusedResult[];
+      if (keywordResults.length > 0) {
+        fusedResults = reciprocalRankFusion(
+          semanticResults,
+          keywordResults,
+          chunkMap
+        );
+      } else {
+        // Fallback to semantic-only results
+        fusedResults = semanticResults.map((r, idx) => ({
+          id: r.chunk.id,
+          chunk: r.chunk,
+          semanticRank: idx + 1,
+          semanticScore: r.score,
+          keywordRank: null,
+          keywordScore: null,
+          fusedScore: r.score,
+        }));
+      }
+
+      // Rerank with Cohere
+      const rerankStart = Date.now();
+      const reranker = getReranker();
+
+      const docsToRerank = fusedResults.slice(0, 25).map((r) => ({
+        id: r.id,
+        content: r.chunk.content,
+        title: r.chunk.title,
+        url: r.chunk.url,
+      }));
+
+      const reranked: RerankResult[] = await reranker.rerank(
+        classified.original,
+        docsToRerank,
+        8
+      );
+
+      rerankMs = Date.now() - rerankStart;
+
+      // Map reranked results back with metadata
+      finalResults = reranked.map((r) => {
+        const original = docsToRerank.find((d) => d.id === r.id)!;
+        return {
+          id: r.id,
+          content: original.content,
+          title: original.title,
+          url: original.url,
+          score: r.relevanceScore,
+        };
+      });
+
+      topScores = finalResults.map((r) => r.score);
+    } else {
+      // ===== LEGACY SEMANTIC-ONLY PIPELINE =====
+      const results = await retriever.retrieve(trimmedMessage, 8);
+      retrievalMs = Date.now() - retrievalStart;
+
+      finalResults = results.map((r) => ({
+        id: r.chunk.id,
+        content: r.chunk.content,
+        title: r.chunk.title,
+        url: r.chunk.url,
+        score: r.score,
+      }));
+
+      topScores = finalResults.map((r) => r.score);
+    }
+
+    // Handle no results
+    if (finalResults.length === 0) {
+      // Log the failed query
+      logQueryAsync(queryId, {
+        timestamp: startTime,
+        query: trimmedMessage,
+        intent: classified.intent,
+        strategy: classified.strategy,
+        retrievalMs,
+        rerankMs,
+        totalMs: Date.now() - startTime,
+        resultCount: 0,
+        topChunkIds: [],
+        topScores: [],
+        model,
+        success: false,
+        errorMessage: "No results found",
+        clientIp,
+      });
+
       return new Response(
         "I couldn't find relevant documentation excerpts for that question. Try rephrasing or search the docs.",
-        { headers: { "Content-Type": "text/plain", ...CORS_HEADERS, ...rateLimitHeaders } }
+        {
+          headers: {
+            "Content-Type": "text/plain",
+            ...CORS_HEADERS,
+            ...rateLimitHeaders,
+            "X-Query-Id": queryId,
+          },
+        }
       );
     }
 
     // Build context from retrieved chunks
-    const context = results
-      .map(
-        (result) =>
-          `[${result.chunk.title}](${result.chunk.url})\n${result.chunk.content.slice(0, 1200)}`
-      )
+    const context = finalResults
+      .map((result) => `[${result.title}](${result.url})\n${result.content.slice(0, 1200)}`)
       .join("\n\n---\n\n");
 
-    const systemPrompt =
-      "You are a helpful assistant for OpenClaw documentation. " +
-      "Answer only from the provided documentation excerpts. " +
-      "If the answer is not in the excerpts, say so and suggest checking the docs. " +
-      "Cite sources by name or URL when relevant.\n\nDocumentation excerpts:\n" +
-      context;
+    const systemPrompt = buildSystemPrompt(context);
 
     // Stream response from OpenAI
-    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        stream: true,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: trimmedMessage },
-        ],
-      }),
-    });
+    const openaiResponse = await fetch(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          stream: true,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: trimmedMessage },
+          ],
+        }),
+      }
+    );
 
     if (!openaiResponse.ok || !openaiResponse.body) {
       return jsonResponse(
@@ -174,6 +356,23 @@ export async function POST(request: NextRequest) {
         rateLimitHeaders
       );
     }
+
+    // Log successful query (async, non-blocking)
+    logQueryAsync(queryId, {
+      timestamp: startTime,
+      query: trimmedMessage,
+      intent: classified.intent,
+      strategy: classified.strategy,
+      retrievalMs,
+      rerankMs,
+      totalMs: Date.now() - startTime,
+      resultCount: finalResults.length,
+      topChunkIds: finalResults.slice(0, 5).map((r) => r.id),
+      topScores: topScores.slice(0, 5),
+      model,
+      success: true,
+      clientIp,
+    });
 
     // Create a TransformStream to process SSE data
     const encoder = new TextEncoder();
@@ -234,13 +433,24 @@ export async function POST(request: NextRequest) {
         "Transfer-Encoding": "chunked",
         ...CORS_HEADERS,
         ...rateLimitHeaders,
+        "X-Query-Id": queryId,
       },
     });
   } catch (error) {
     console.error("[Error]", error);
-    return jsonResponse(
-      { error: "Internal Server Error", status: 500 },
-      500
-    );
+    return jsonResponse({ error: "Internal Server Error", status: 500 }, 500);
   }
+}
+
+/**
+ * Log query asynchronously without blocking the response.
+ */
+function logQueryAsync(
+  queryId: string,
+  data: Omit<QueryLog, "id">
+): void {
+  const observability = getObservabilityService();
+  observability.logQuery({ id: queryId, ...data }).catch((err) => {
+    console.error("Failed to log query:", err);
+  });
 }
