@@ -6,11 +6,14 @@
  *   OPENAI_API_KEY - for embeddings and chat completions
  *   UPSTASH_VECTOR_REST_URL - Upstash Vector endpoint
  *   UPSTASH_VECTOR_REST_TOKEN - Upstash Vector auth token
+ *   UPSTASH_REDIS_REST_URL - Upstash Redis endpoint (for rate limiting)
+ *   UPSTASH_REDIS_REST_TOKEN - Upstash Redis auth token (for rate limiting)
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { Embeddings } from "../rag/embeddings.js";
 import { DocsStore } from "../rag/store-upstash.js";
 import { Retriever } from "../rag/retriever-upstash.js";
+import { checkRateLimit, getClientIp } from "../rag/ratelimit.js";
 
 const MAX_MESSAGE_LENGTH = 2000;
 
@@ -99,6 +102,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     sendJson(res, 405, { error: "Method not allowed" });
     return;
+  }
+
+  // Rate limiting
+  const clientIp = getClientIp(req.headers as Record<string, string | string[] | undefined>);
+  const rateLimitResult = await checkRateLimit(clientIp);
+
+  if (rateLimitResult) {
+    // Add rate limit headers
+    res.setHeader("X-RateLimit-Limit", rateLimitResult.limit.toString());
+    res.setHeader("X-RateLimit-Remaining", rateLimitResult.remaining.toString());
+    res.setHeader("X-RateLimit-Reset", rateLimitResult.reset.toString());
+
+    if (!rateLimitResult.success) {
+      res.setHeader("Retry-After", Math.ceil((rateLimitResult.reset - Date.now()) / 1000).toString());
+      sendJson(res, 429, { error: "Too many requests. Please try again later." });
+      return;
+    }
   }
 
   // Validate environment
