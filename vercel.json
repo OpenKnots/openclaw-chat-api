@@ -1,15 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "builds": [
-    { "src": "api/**/*.ts", "use": "@vercel/node" },
-    { "src": "public/**", "use": "@vercel/static" }
-  ],
-  "routes": [
-    { "src": "/favicon.png", "dest": "/public/favicon.png" },
-    { "src": "/og-image.png", "dest": "/public/og-image.png" },
-    { "handle": "filesystem" },
-    { "src": "/api/webhook", "dest": "/api/webhook.ts" },
-    { "src": "/(.*)", "dest": "/api/index.ts" }
+  "rewrites": [
+    { "source": "/api/webhook", "destination": "/api/webhook" },
+    { "source": "/(.*)", "destination": "/api" }
   ]
 }
