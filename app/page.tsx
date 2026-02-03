@@ -41,10 +41,6 @@ export default async function Home() {
           <span className="status-label">Indexed</span>
           <span className="status-value">{status.chunks.toLocaleString()} chunks</span>
         </div>
-        <div className="status-item">
-          <span className="status-label">Model</span>
-          <span className="status-value">GPT-4.1 mini</span>
-        </div>
       </div>
 
       <div className="glass-card chat-section">

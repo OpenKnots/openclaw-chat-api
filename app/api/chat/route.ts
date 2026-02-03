@@ -77,9 +77,16 @@ export async function POST(request: NextRequest) {
 
     // Parse body
     let message = "";
+    const ALLOWED_MODELS = ["gpt-5-nano", "gpt-4.1-nano", "gpt-4o-mini", "gpt-5-mini", "gpt-5.2"];
+    const defaultModel = process.env.DEFAULT_CHAT_MODEL || "gpt-4o-mini";
+    let model = ALLOWED_MODELS.includes(defaultModel) ? defaultModel : "gpt-4o-mini";
+    
     try {
       const body = await request.json();
       message = body?.message;
+      if (body?.model && typeof body.model === "string" && ALLOWED_MODELS.includes(body.model)) {
+        model = body.model;
+      }
     } catch {
       return jsonResponse(
         { error: "Invalid JSON", status: 400 },
@@ -151,7 +158,7 @@ export async function POST(request: NextRequest) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-4.1-mini",
+        model,
         stream: true,
         messages: [
           { role: "system", content: systemPrompt },
