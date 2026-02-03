@@ -9,7 +9,7 @@
     { "src": "/favicon.png", "dest": "/public/favicon.png" },
     { "src": "/og-image.png", "dest": "/public/og-image.png" },
     { "handle": "filesystem" },
-    { "src": "/api/webhook", "dest": "/api/webhook" },
-    { "src": "/(.*)", "dest": "/api/" }
+    { "src": "/api/webhook", "dest": "/api/webhook.ts" },
+    { "src": "/(.*)", "dest": "/api/index.ts" }
   ]
 }
