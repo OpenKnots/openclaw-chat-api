@@ -10,7 +10,7 @@ import { checkRateLimit, getClientIp } from "@/rag/ratelimit";
 
 export const runtime = "edge";
 
-const MAX_MESSAGE_LENGTH = 2000;
+const MAX_MESSAGE_LENGTH = 2_000;
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "https://claw.openknot.ai",
