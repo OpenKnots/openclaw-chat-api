@@ -1,6 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
+  "buildCommand": "",
+  "outputDirectory": "",
+  "framework": null,
   "rewrites": [
     { "source": "/api/webhook", "destination": "/api/webhook" },
     { "source": "/(.*)", "destination": "/api" }
