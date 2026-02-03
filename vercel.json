@@ -3,12 +3,16 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/index.ts",
+      "src": "api/chat.ts",
       "use": "@vercel/node"
     },
     {
       "src": "api/webhook.ts",
       "use": "@vercel/node"
+    },
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
     }
   ],
   "rewrites": [
@@ -17,8 +21,16 @@
       "destination": "/api/webhook"
     },
     {
+      "source": "/favicon.png",
+      "destination": "/public/favicon.png"
+    },
+    {
+      "source": "/og-image.png",
+      "destination": "/public/og-image.png"
+    },
+    {
       "source": "/(.*)",
-      "destination": "/api/index"
+      "destination": "/api/chat"
     }
   ]
 }
