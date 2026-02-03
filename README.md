@@ -1,53 +1,74 @@
-# Express API Starter
+# OpenClaw Chat API
 
-How to use this template:
+RAG-based documentation chat API for [OpenClaw](https://openclaw.org). Uses vector search to retrieve relevant documentation chunks and streams AI-generated answers.
 
-```sh
-npx create-express-api --directory my-api-name
+## Stack
+
+- **Runtime**: [Bun](https://bun.sh)
+- **Deployment**: [Vercel](https://vercel.com) serverless functions
+- **Vector Store**: [Upstash Vector](https://upstash.com/vector)
+- **AI**: [OpenAI](https://openai.com) (gpt-4o-mini for chat, text-embedding-3-small for embeddings)
+- **Language**: TypeScript
+
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/chat` | POST | Send a question, get a streaming response |
+| `/health` | GET | Health check |
+
+### POST /chat
+
+```json
+{
+  "message": "How do I get started with OpenClaw?"
+}
 ```
 
-Includes API Server utilities:
-
-* [morgan](https://www.npmjs.com/package/morgan)
-  * HTTP request logger middleware for node.js
-* [helmet](https://www.npmjs.com/package/helmet)
-  * Helmet helps you secure your Express apps by setting various HTTP headers. It's not a silver bullet, but it can help!
-* [dotenv](https://www.npmjs.com/package/dotenv)
-  * Dotenv is a zero-dependency module that loads environment variables from a `.env` file into `process.env`
-* [cors](https://www.npmjs.com/package/cors)
-  * CORS is a node.js package for providing a Connect/Express middleware that can be used to enable CORS with various options.
-
-Development utilities:
-
-* [nodemon](https://www.npmjs.com/package/nodemon)
-  * nodemon is a tool that helps develop node.js based applications by automatically restarting the node application when file changes in the directory are detected.
-* [eslint](https://www.npmjs.com/package/eslint)
-  * ESLint is a tool for identifying and reporting on patterns found in ECMAScript/JavaScript code.
-* [jest](https://www.npmjs.com/package/jest)
-  * Jest is a delightful JavaScript Testing Framework with a focus on simplicity.
-* [supertest](https://www.npmjs.com/package/supertest)
-  * HTTP assertions made easy via superagent.
+Returns a streaming `text/plain` response with the AI-generated answer.
 
 ## Setup
 
-```
-npm install
+1. Install dependencies:
+
+```sh
+bun install
 ```
 
-## Lint
+2. Copy `.env.example` to `.env` and fill in your credentials:
 
-```
-npm run lint
+```sh
+cp .env.example .env
 ```
 
-## Test
+Required environment variables:
 
-```
-npm test
+- `OPENAI_API_KEY` - OpenAI API key
+- `UPSTASH_VECTOR_REST_URL` - Upstash Vector endpoint
+- `UPSTASH_VECTOR_REST_TOKEN` - Upstash Vector auth token
+
+3. Build the vector index (indexes documentation into Upstash):
+
+```sh
+bun run build:index
 ```
 
 ## Development
 
+```sh
+bun run dev
 ```
-npm run dev
+
+Runs locally using Vercel CLI at http://localhost:3000.
+
+## Deploy
+
+```sh
+bun run deploy
 ```
+
+Deploys to Vercel.
+
+## License
+
+MIT

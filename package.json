@@ -1,34 +1,29 @@
 {
-  "name": "express-api-starter",
-  "version": "1.2.0",
-  "description": "A basic starter for an express.js API",
-  "main": "index.js",
-  "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
-    "lint": "eslint --fix src",
-    "test": "jest"
-  },
-  "keywords": [],
-  "author": "CJ R. <cj@null.computer> (https://w3cj.now.sh)",
+  "name": "openclaw-chat-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RAG-based docs chat API for OpenClaw documentation",
+  "author": "OpenKnot AI",
+  "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/w3cj/express-api-starter.git"
+    "url": "https://github.com/OpenKnots/openclaw-chat-api.git"
   },
-  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/OpenKnots/openclaw-chat-api/issues"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "build:index": "bun build-vector-index.ts",
+    "deploy": "vercel"
+  },
   "dependencies": {
-    "cors": "^2.8.6",
-    "dotenv": "^16.6.1",
-    "express": "^4.22.1",
-    "helmet": "^7.2.0",
-    "morgan": "^1.10.1"
+    "@upstash/vector": "^1.2.2",
+    "openai": "^6.17.0"
   },
   "devDependencies": {
-    "eslint": "^8.57.1",
-    "eslint-config-airbnb-base": "^15.0.0",
-    "eslint-plugin-import": "^2.32.0",
-    "jest": "^29.7.0",
-    "nodemon": "^3.1.11",
-    "supertest": "^6.3.4"
+    "@vercel/node": "^5.5.28",
+    "typescript": "^5.9.3"
   }
 }
