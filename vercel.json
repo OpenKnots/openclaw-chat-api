@@ -3,9 +3,5 @@
   "version": 2,
   "buildCommand": "",
   "outputDirectory": "",
-  "framework": null,
-  "rewrites": [
-    { "source": "/api/webhook", "destination": "/api/webhook" },
-    { "source": "/(.*)", "destination": "/api" }
-  ]
+  "framework": null
 }

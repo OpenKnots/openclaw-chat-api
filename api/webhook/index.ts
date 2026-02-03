@@ -8,11 +8,24 @@
  * 3. Select "push" events and set content type to application/json
  */
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { handle } from "hono/vercel";
 import { HTTPException } from "hono/http-exception";
-import { indexDocs, verifyGitHubSignature, isMainBranchPush } from "../rag/indexer.js";
+import { indexDocs, verifyGitHubSignature, isMainBranchPush } from "../../rag/indexer.js";
 
 const app = new Hono();
+
+// CORS middleware
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",").map((o) => o.trim()) ?? [];
+app.use(
+  "*",
+  cors({
+    origin: (origin) => {
+      if (!origin || allowedOrigins.length === 0) return origin ?? "*";
+      return allowedOrigins.includes(origin) ? origin : null;
+    },
+  })
+);
 
 // Store indexing status
 let indexingStatus = {
