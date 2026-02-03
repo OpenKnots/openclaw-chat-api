@@ -10,7 +10,7 @@ import { checkRateLimit, getClientIp } from "@/rag/ratelimit";
 
 export const runtime = "edge";
 
-const MAX_MESSAGE_LENGTH = 2_000;
+const MAX_MESSAGE_LENGTH = 2000;
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "https://claw.openknot.ai",
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-5-mini",
+        model: "gpt-4o-mini",
         stream: true,
         messages: [
           { role: "system", content: systemPrompt },
