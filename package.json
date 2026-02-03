@@ -22,6 +22,7 @@
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.36.2",
     "@upstash/vector": "^1.2.2",
+    "hono": "^4.11.7",
     "openai": "^6.17.0"
   },
   "devDependencies": {
