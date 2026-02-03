@@ -12,42 +12,26 @@ export const runtime = "edge";
 
 const MAX_MESSAGE_LENGTH = 2000;
 
-const ALLOWED_ORIGINS = [
-  "https://docs.openclaw.ai",
-  "https://claw-api.openknot.ai",
-  "https://claw.openknot.ai"
-];
-
-function getCorsHeaders(request: Request): Record<string, string> {
-  const origin = request.headers.get("Origin") || "";
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-
-  return {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-  };
-}
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "https://claw.openknot.ai",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
 
 // Handle preflight requests
-export async function OPTIONS(request: NextRequest) {
+export async function OPTIONS() {
   return new Response(null, {
     status: 204,
-    headers: getCorsHeaders(request),
+    headers: CORS_HEADERS,
   });
 }
 
-function jsonResponse(
-  request: NextRequest,
-  data: object,
-  status = 200,
-  headers: Record<string, string> = {}
-) {
+function jsonResponse(data: object, status = 200, headers: Record<string, string> = {}) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       "Content-Type": "application/json",
-      ...getCorsHeaders(request),
+      ...CORS_HEADERS,
       ...headers,
     },
   });
@@ -74,7 +58,6 @@ export async function POST(request: NextRequest) {
           (rateLimitResult.reset - Date.now()) / 1000
         ).toString();
         return jsonResponse(
-          request as NextRequest,
           { error: "Too many requests. Please try again later.", status: 429 },
           429,
           rateLimitHeaders
@@ -86,7 +69,6 @@ export async function POST(request: NextRequest) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return jsonResponse(
-        request as NextRequest,
         { error: "Server configuration error", status: 500 },
         500,
         rateLimitHeaders
@@ -100,7 +82,6 @@ export async function POST(request: NextRequest) {
       message = body?.message;
     } catch {
       return jsonResponse(
-        request as NextRequest,
         { error: "Invalid JSON", status: 400 },
         400,
         rateLimitHeaders
@@ -109,7 +90,6 @@ export async function POST(request: NextRequest) {
 
     if (!message || typeof message !== "string") {
       return jsonResponse(
-        request as NextRequest,
         { error: "message required", status: 400 },
         400,
         rateLimitHeaders
@@ -119,7 +99,6 @@ export async function POST(request: NextRequest) {
     const trimmedMessage = message.trim();
     if (!trimmedMessage) {
       return jsonResponse(
-        request as NextRequest,
         { error: "message required", status: 400 },
         400,
         rateLimitHeaders
@@ -128,7 +107,6 @@ export async function POST(request: NextRequest) {
 
     if (trimmedMessage.length > MAX_MESSAGE_LENGTH) {
       return jsonResponse(
-        request as NextRequest,
         { error: `Message too long (max ${MAX_MESSAGE_LENGTH} characters)`, status: 400 },
         400,
         rateLimitHeaders
@@ -146,7 +124,7 @@ export async function POST(request: NextRequest) {
     if (results.length === 0) {
       return new Response(
         "I couldn't find relevant documentation excerpts for that question. Try rephrasing or search the docs.",
-        { headers: { "Content-Type": "text/plain", ...getCorsHeaders(request), ...rateLimitHeaders } }
+        { headers: { "Content-Type": "text/plain", ...CORS_HEADERS, ...rateLimitHeaders } }
       );
     }
 
@@ -184,7 +162,6 @@ export async function POST(request: NextRequest) {
 
     if (!openaiResponse.ok || !openaiResponse.body) {
       return jsonResponse(
-        request as NextRequest,
         { error: `OpenAI API error: ${openaiResponse.status}`, status: 502 },
         502,
         rateLimitHeaders
@@ -248,14 +225,13 @@ export async function POST(request: NextRequest) {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
         "Transfer-Encoding": "chunked",
-        ...getCorsHeaders(request),
+        ...CORS_HEADERS,
         ...rateLimitHeaders,
       },
     });
   } catch (error) {
     console.error("[Error]", error);
     return jsonResponse(
-      request as NextRequest,
       { error: "Internal Server Error", status: 500 },
       500
     );
