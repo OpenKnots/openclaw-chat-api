@@ -8,6 +8,7 @@ const MAX_MESSAGE_LENGTH = 2000;
 const AVAILABLE_MODELS = [
   { id: "gpt-5-nano", name: "GPT-5 nano", description: "Cheapest" },
   { id: "gpt-4.1-nano", name: "GPT-4.1 nano", description: "Great with retrieval" },
+  { id: "gpt-4.1-mini", name: "GPT-4.1 mini", description: "Fast & capable" },
   { id: "gpt-4o-mini", name: "GPT-4o mini", description: "Quality/latency/value" },
   { id: "gpt-5-mini", name: "GPT-5 mini", description: "Better headroom" },
   { id: "gpt-5.2", name: "GPT-5.2", description: "Hard questions" },

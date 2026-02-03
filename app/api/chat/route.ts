@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
 
     // Parse body
     let message = "";
-    const ALLOWED_MODELS = ["gpt-5-nano", "gpt-4.1-nano", "gpt-4o-mini", "gpt-5-mini", "gpt-5.2"];
+    const ALLOWED_MODELS = ["gpt-5-nano", "gpt-4.1-nano", "gpt-4.1-mini", "gpt-4o-mini", "gpt-5-mini", "gpt-5.2"];
     const defaultModel = process.env.DEFAULT_CHAT_MODEL || "gpt-4o-mini";
     let model = ALLOWED_MODELS.includes(defaultModel) ? defaultModel : "gpt-4o-mini";
     
