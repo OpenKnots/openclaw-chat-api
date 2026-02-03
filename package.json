@@ -14,8 +14,7 @@
   },
   "type": "module",
   "scripts": {
-    "dev": "echo 'Run: vercel dev' && exit 0",
-    "start:local": "bun run --watch api/index.ts",
+    "dev": "bun run --watch dev-server.ts",
     "build:index": "bun build-vector-index.ts",
     "deploy": "vercel"
   },
