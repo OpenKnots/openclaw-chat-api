@@ -2,35 +2,15 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "builds": [
-    {
-      "src": "api/chat.ts",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/webhook.ts",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "public/**",
-      "use": "@vercel/static"
-    }
+    { "src": "api/chat.ts", "use": "@vercel/node" },
+    { "src": "api/webhook.ts", "use": "@vercel/node" },
+    { "src": "public/**", "use": "@vercel/static" }
   ],
-  "rewrites": [
-    {
-      "source": "/api/webhook",
-      "destination": "/api/webhook"
-    },
-    {
-      "source": "/favicon.png",
-      "destination": "/public/favicon.png"
-    },
-    {
-      "source": "/og-image.png",
-      "destination": "/public/og-image.png"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/api/chat"
-    }
+  "routes": [
+    { "src": "/favicon.png", "dest": "/public/favicon.png" },
+    { "src": "/og-image.png", "dest": "/public/og-image.png" },
+    { "handle": "filesystem" },
+    { "src": "/api/webhook", "dest": "/api/webhook" },
+    { "src": "/(.*)", "dest": "/api/chat" }
   ]
 }
