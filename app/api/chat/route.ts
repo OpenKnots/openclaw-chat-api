@@ -127,10 +127,14 @@ export async function POST(request: NextRequest) {
       "gpt-5-mini",
       "gpt-5.2",
     ];
+    const ALLOWED_STRATEGIES = ["auto", "hybrid", "semantic", "keyword"] as const;
+    type UserStrategy = (typeof ALLOWED_STRATEGIES)[number];
+    
     const defaultModel = process.env.DEFAULT_CHAT_MODEL || "gpt-4o-mini";
     let model = ALLOWED_MODELS.includes(defaultModel)
       ? defaultModel
       : "gpt-4o-mini";
+    let userStrategy: UserStrategy = "auto";
 
     try {
       const body = await request.json();
@@ -141,6 +145,13 @@ export async function POST(request: NextRequest) {
         ALLOWED_MODELS.includes(body.model)
       ) {
         model = body.model;
+      }
+      if (
+        body?.retrieval &&
+        typeof body.retrieval === "string" &&
+        ALLOWED_STRATEGIES.includes(body.retrieval as UserStrategy)
+      ) {
+        userStrategy = body.retrieval as UserStrategy;
       }
     } catch {
       return jsonResponse(
@@ -180,6 +191,11 @@ export async function POST(request: NextRequest) {
 
     // Classify query for optimal retrieval strategy
     const classified: ClassifiedQuery = classifyQuery(trimmedMessage);
+    
+    // Override strategy if user explicitly selected one (not "auto")
+    if (userStrategy !== "auto") {
+      classified.strategy = userStrategy;
+    }
 
     // Initialize RAG components
     const embeddings = new Embeddings(apiKey);
@@ -204,10 +220,16 @@ export async function POST(request: NextRequest) {
       const termIndex = await loadTermIndex();
       const bm25Searcher = termIndex ? new BM25Searcher(termIndex) : null;
 
-      // Parallel retrieval based on strategy
-      let semanticResults = await retriever.retrieve(classified.expanded, 20);
+      // Retrieve based on strategy
+      let semanticResults: Awaited<ReturnType<typeof retriever.retrieve>> = [];
       let keywordResults: Array<{ id: string; score: number }> = [];
 
+      // Semantic search (for semantic and hybrid strategies)
+      if (classified.strategy !== "keyword") {
+        semanticResults = await retriever.retrieve(classified.expanded, 20);
+      }
+
+      // Keyword search (for keyword and hybrid strategies)
       if (bm25Searcher && classified.strategy !== "semantic") {
         const keywordQuery = classified.keywords.join(" ");
         keywordResults = bm25Searcher.search(keywordQuery, 20);
@@ -215,21 +237,49 @@ export async function POST(request: NextRequest) {
 
       retrievalMs = Date.now() - retrievalStart;
 
-      // Build chunk map for fusion
+      // Build chunk map for fusion (from semantic results)
       const chunkMap = new Map(
         semanticResults.map((r) => [r.chunk.id, r.chunk])
       );
 
-      // Fuse results using RRF
+      // Fuse results based on strategy
       let fusedResults: FusedResult[];
-      if (keywordResults.length > 0) {
+      
+      if (classified.strategy === "hybrid" && keywordResults.length > 0 && semanticResults.length > 0) {
+        // Hybrid: combine both using RRF
         fusedResults = reciprocalRankFusion(
           semanticResults,
           keywordResults,
           chunkMap
         );
+      } else if (classified.strategy === "keyword" && keywordResults.length > 0) {
+        // Keyword only: need to fetch chunk data for keyword results
+        // For now, fall back to semantic if we have no chunk data
+        if (semanticResults.length > 0) {
+          // Use semantic results that match keyword IDs, prioritized by keyword rank
+          const keywordIds = new Set(keywordResults.map(r => r.id));
+          const matchingResults = semanticResults.filter(r => keywordIds.has(r.chunk.id));
+          fusedResults = matchingResults.map((r, idx) => ({
+            id: r.chunk.id,
+            chunk: r.chunk,
+            semanticRank: null,
+            semanticScore: null,
+            keywordRank: idx + 1,
+            keywordScore: keywordResults.find(kr => kr.id === r.chunk.id)?.score || 0,
+            fusedScore: keywordResults.find(kr => kr.id === r.chunk.id)?.score || 0,
+          }));
+        } else {
+          // No semantic results, need to do a semantic search to get chunk data
+          const semanticFallback = await retriever.retrieve(classified.expanded, 20);
+          semanticFallback.forEach(r => chunkMap.set(r.chunk.id, r.chunk));
+          fusedResults = reciprocalRankFusion(
+            semanticFallback,
+            keywordResults,
+            chunkMap
+          );
+        }
       } else {
-        // Fallback to semantic-only results
+        // Semantic only or fallback
         fusedResults = semanticResults.map((r, idx) => ({
           id: r.chunk.id,
           chunk: r.chunk,

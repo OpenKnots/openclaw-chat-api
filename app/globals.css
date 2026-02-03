@@ -159,24 +159,36 @@ h1 {
   padding: 1.5rem;
 }
 
+.selectors-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  align-items: center;
+}
+
 .model-selector {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 1rem;
+  min-width: 0;
 }
 
 .model-label {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 500;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .model-select {
-  flex: 1;
-  padding: 0.625rem 1rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0.625rem 2.25rem 0.625rem 1rem;
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-sm);
   background: rgba(0, 0, 0, 0.4);
@@ -189,7 +201,8 @@ h1 {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M3 4.5L6 7.5L9 4.5'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.75rem center;
-  padding-right: 2rem;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 
 .model-select:hover {
@@ -438,7 +451,28 @@ footer {
   text-decoration: none;
 }
 
-@media (max-width: 640px) {
+/* Tablet breakpoint */
+@media (max-width: 768px) {
+  .selectors-row {
+    gap: 0.75rem;
+  }
+
+  .model-selector {
+    gap: 0.5rem;
+  }
+
+  .model-label {
+    font-size: 0.7rem;
+  }
+
+  .model-select {
+    font-size: 0.85rem;
+    padding: 0.5rem 2rem 0.5rem 0.75rem;
+  }
+}
+
+/* Mobile breakpoint */
+@media (max-width: 540px) {
   .container {
     padding: 2rem 1rem;
   }
@@ -448,14 +482,26 @@ footer {
     gap: 1rem;
   }
 
+  .selectors-row {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
   .model-selector {
-    flex-direction: column;
-    align-items: stretch;
+    grid-template-columns: 4.5rem 1fr;
     gap: 0.5rem;
+  }
+
+  .model-label {
+    text-align: right;
   }
 
   .chat-form {
     flex-direction: column;
+  }
+
+  .chat-btn {
+    width: 100%;
   }
 
   .endpoint {
@@ -465,6 +511,17 @@ footer {
   }
 
   .endpoint-desc {
+    text-align: left;
+  }
+}
+
+/* Very small screens */
+@media (max-width: 360px) {
+  .model-selector {
+    grid-template-columns: 1fr;
+  }
+
+  .model-label {
     text-align: left;
   }
 }

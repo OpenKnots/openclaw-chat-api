@@ -14,7 +14,15 @@ const AVAILABLE_MODELS = [
   { id: "gpt-5.2", name: "GPT-5.2", description: "Hard questions" },
 ] as const;
 
+const RETRIEVAL_STRATEGIES = [
+  { id: "auto", name: "Auto", description: "Best for query" },
+  { id: "hybrid", name: "Hybrid", description: "Semantic + Keyword" },
+  { id: "semantic", name: "Semantic", description: "Meaning-based" },
+  { id: "keyword", name: "Keyword", description: "Exact match" },
+] as const;
+
 type ModelId = (typeof AVAILABLE_MODELS)[number]["id"];
+type RetrievalStrategy = (typeof RETRIEVAL_STRATEGIES)[number]["id"];
 
 export default function ChatForm() {
   const [message, setMessage] = useState("");
@@ -22,6 +30,7 @@ export default function ChatForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ModelId>("gpt-4o-mini");
+  const [selectedStrategy, setSelectedStrategy] = useState<RetrievalStrategy>("auto");
   const responseRef = useRef<HTMLDivElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -37,7 +46,11 @@ export default function ChatForm() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmedMessage, model: selectedModel }),
+        body: JSON.stringify({
+          message: trimmedMessage,
+          model: selectedModel,
+          retrieval: selectedStrategy,
+        }),
       });
 
       if (!res.ok) {
@@ -77,23 +90,43 @@ export default function ChatForm() {
 
   return (
     <>
-      <div className="model-selector">
-        <label htmlFor="model-select" className="model-label">
-          Model
-        </label>
-        <select
-          id="model-select"
-          className="model-select"
-          value={selectedModel}
-          onChange={(e) => setSelectedModel(e.target.value as ModelId)}
-          disabled={isLoading}
-        >
-          {AVAILABLE_MODELS.map((model) => (
-            <option key={model.id} value={model.id}>
-              {model.name} — {model.description}
-            </option>
-          ))}
-        </select>
+      <div className="selectors-row">
+        <div className="model-selector">
+          <label htmlFor="model-select" className="model-label">
+            Model
+          </label>
+          <select
+            id="model-select"
+            className="model-select"
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value as ModelId)}
+            disabled={isLoading}
+          >
+            {AVAILABLE_MODELS.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.name} — {model.description}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="model-selector">
+          <label htmlFor="strategy-select" className="model-label">
+            Search
+          </label>
+          <select
+            id="strategy-select"
+            className="model-select"
+            value={selectedStrategy}
+            onChange={(e) => setSelectedStrategy(e.target.value as RetrievalStrategy)}
+            disabled={isLoading}
+          >
+            {RETRIEVAL_STRATEGIES.map((strategy) => (
+              <option key={strategy.id} value={strategy.id}>
+                {strategy.name} — {strategy.description}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
       <form className="chat-form" onSubmit={handleSubmit}>
         <input

@@ -1,5 +1,5 @@
 import { DocsStore } from "@/rag/store-upstash";
-import ChatForm from "./components/ChatForm";
+import ChatForm from "@/app/components/chat-form";
 
 async function getStatus() {
   try {

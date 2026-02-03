@@ -1,6 +1,6 @@
 {
   "name": "openclaw-chat-api",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "description": "RAG-based docs chat API for OpenClaw documentation",
   "author": "OpenKnot AI <val@openknot.ai>",
