@@ -1,11 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "builds": [
-    { "src": "api/*.ts", "use": "@vercel/node" }
-  ],
-  "routes": [
-    { "src": "/api/webhook", "dest": "/api/webhook" },
-    { "src": "/(.*)", "dest": "/api" }
+  "rewrites": [
+    { "source": "/api/webhook", "destination": "/api/webhook" },
+    { "source": "/(.*)", "destination": "/api" }
   ]
 }

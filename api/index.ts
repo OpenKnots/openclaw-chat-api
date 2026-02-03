@@ -367,6 +367,11 @@ app.route("/api", api);
 // Vercel Export
 // =============================================================================
 
+// Use Edge Runtime for Web API Request compatibility with Hono
+export const config = {
+  runtime: 'edge',
+};
+
 // Export handlers for Vercel serverless functions
 const handler = handle(app);
 export const GET = handler;

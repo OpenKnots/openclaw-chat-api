@@ -147,6 +147,11 @@ app.post("/", async (c) => {
   }
 });
 
+// Use Edge Runtime for Web API Request compatibility with Hono
+export const config = {
+  runtime: 'edge',
+};
+
 // Export handlers for Vercel
 const handler = handle(app);
 export const GET = handler;
