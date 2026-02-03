@@ -56,8 +56,8 @@ app.post("/", async (c) => {
 
   // Get raw body for signature verification
   const rawBody = await c.req.text();
-  const signature = c.req.header("X-Hub-Signature-256");
-  const event = c.req.header("X-GitHub-Event");
+  const signature = c.req.header("X-Hub-Signature-256") ?? null;
+  const event = c.req.header("X-GitHub-Event") ?? null;
   const deliveryId = c.req.header("X-GitHub-Delivery");
 
   console.log(`Webhook received: event=${event}, delivery=${deliveryId}`);
