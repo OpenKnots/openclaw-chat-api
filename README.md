@@ -73,7 +73,7 @@ cp .env.example .env
 | `UPSTASH_VECTOR_REST_TOKEN` | Yes      | Upstash Vector auth token              |
 | `UPSTASH_REDIS_REST_URL`    | Yes      | Upstash Redis endpoint (rate limiting) |
 | `UPSTASH_REDIS_REST_TOKEN`  | Yes      | Upstash Redis auth token               |
-| `GITHUB_WEBHOOK_SECRET`     | No       | Secret for GitHub webhook verification |
+| `GITHUB_WEBHOOK_SECRET`     | No       | Secret for GitHub webhook (required for automatic re-indexing) |
 
 3. Build the vector index (indexes documentation into Upstash):
 
@@ -107,6 +107,46 @@ bun run deploy
 ```
 
 Deploys to Vercel.
+
+## Automatic Documentation Updates
+
+The API supports automatic re-indexing when documentation changes are pushed to the main branch. This is powered by a GitHub webhook that triggers the `/api/webhook` endpoint.
+
+### How It Works
+
+1. A push is made to the `main` (or `master`) branch of your docs repository
+2. GitHub sends a webhook payload to `/api/webhook`
+3. The API verifies the signature, fetches `https://docs.openclaw.ai/llms-full.txt`, chunks the content, generates embeddings, and replaces the vector store
+
+### Setting Up the Webhook
+
+1. **Set the webhook secret** in your environment variables:
+
+   ```sh
+   GITHUB_WEBHOOK_SECRET=your-secret-here
+   ```
+
+2. **Create a webhook in your docs repository**:
+   - Go to your docs repo → Settings → Webhooks → Add webhook
+   - **Payload URL**: `https://your-api-domain.com/api/webhook`
+   - **Content type**: `application/json`
+   - **Secret**: Use the same value as `GITHUB_WEBHOOK_SECRET`
+   - **Events**: Select "Just the push event"
+
+3. **Verify it's working**:
+   - GitHub sends a `ping` event when the webhook is created
+   - Check the webhook's "Recent Deliveries" tab for the response
+   - Push a change to main and confirm re-indexing occurs
+
+### Webhook Status
+
+You can check the webhook status at any time:
+
+```sh
+curl https://your-api-domain.com/api/webhook
+```
+
+Returns the current indexing status, last indexed time, and result of the most recent indexing run.
 
 ## License
 
