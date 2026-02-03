@@ -172,10 +172,15 @@ export async function POST(request: NextRequest) {
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
 
+    let buffer = "";
+
     const transformStream = new TransformStream({
-      async transform(chunk, controller) {
-        const text = decoder.decode(chunk, { stream: true });
-        const lines = text.split("\n");
+      transform(chunk, controller) {
+        buffer += decoder.decode(chunk, { stream: true });
+        const lines = buffer.split("\n");
+
+        // Keep the last (potentially incomplete) line in the buffer
+        buffer = lines.pop() || "";
 
         for (const line of lines) {
           const trimmed = line.trim();
@@ -191,6 +196,23 @@ export async function POST(request: NextRequest) {
             }
           } catch {
             // Ignore malformed SSE lines
+          }
+        }
+      },
+      flush() {
+        // Process any remaining buffered data on stream end
+        if (buffer.trim().startsWith("data:")) {
+          const data = buffer.trim().slice(5).trim();
+          if (data && data !== "[DONE]") {
+            try {
+              const json = JSON.parse(data);
+              const delta = json.choices?.[0]?.delta?.content;
+              if (delta) {
+                encoder.encode(delta);
+              }
+            } catch {
+              // Ignore
+            }
           }
         }
       },
