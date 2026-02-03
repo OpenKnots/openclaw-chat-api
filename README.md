@@ -2,7 +2,7 @@
 
 ![OpenClaw Docs Agent](public/og-image.png)
 
-AI-powered documentation chatbot API for [OpenClaw](https://openclaw.ai) and threaded by [OpenKnot](https://openknot.ai). 
+AI-powered documentation chatbot API for [OpenClaw](https://openclaw.ai) and threaded by [OpenKnot](https://openknot.ai).
 
 This powers the embedded docs agent that helps users navigate and understand OpenClaw's documentation through natural conversation.
 
@@ -24,11 +24,11 @@ This API serves as the backend for OpenClaw's docs chat widget. It uses RAG (Ret
 
 ## API Endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/chat` | POST | Send a question, get a streaming response |
-| `/api/health` | GET | Health check |
-| `/api/webhook` | POST | GitHub docs webhook for re-indexing |
+| Endpoint       | Method | Description                               |
+| -------------- | ------ | ----------------------------------------- |
+| `/api/chat`    | POST   | Send a question, get a streaming response |
+| `/api/health`  | GET    | Health check                              |
+| `/api/webhook` | POST   | GitHub docs webhook for re-indexing       |
 
 ### POST /api/chat
 
