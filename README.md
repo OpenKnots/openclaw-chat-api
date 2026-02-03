@@ -24,10 +24,11 @@ This API serves as the backend for OpenClaw's docs chat widget. It uses RAG (Ret
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/chat` | POST | Send a question, get a streaming response |
-| `/health` | GET | Health check |
+| `/api/chat` | POST | Send a question, get a streaming response |
+| `/api/health` | GET | Health check |
+| `/api/webhook` | POST | GitHub docs webhook for re-indexing |
 
-### POST /chat
+### POST /api/chat
 
 ```json
 {

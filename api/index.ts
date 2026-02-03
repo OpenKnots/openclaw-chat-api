@@ -22,8 +22,9 @@ import { checkRateLimit, getClientIp } from "../rag/ratelimit.js";
 
 const MAX_MESSAGE_LENGTH = 2000;
 
-// Create Hono app
+// Create Hono apps - main app and API sub-app
 const app = new Hono();
+const api = new Hono();
 
 // =============================================================================
 // Middleware Stack
@@ -85,8 +86,9 @@ app.notFound((c) => {
       message: `The endpoint ${c.req.method} ${c.req.path} does not exist`,
       availableEndpoints: {
         "GET /": "Home page with interactive UI",
-        "GET /health": "Health check endpoint",
-        "POST /chat": "Chat endpoint with streaming response",
+        "GET /api/health": "Health check endpoint",
+        "POST /api/chat": "Chat endpoint with streaming response",
+        "POST /api/webhook": "GitHub docs webhook",
       },
     },
     404
@@ -111,7 +113,7 @@ app.get("/favicon.ico", (c) => {
 });
 
 // Health check endpoint
-app.get("/health", async (c) => {
+api.get("/health", async (c) => {
   try {
     const store = new DocsStore();
     const count = await store.count();
@@ -177,13 +179,13 @@ app.get("/", async (c) => {
     <div class="glass-card endpoints-section">
       <div class="chat-header"><h2>API Reference</h2></div>
       <div class="endpoint-list">
-        <div class="endpoint"><span class="method get">GET</span><span class="endpoint-path">/health</span><span class="endpoint-desc">Health check & stats</span></div>
-        <div class="endpoint"><span class="method post">POST</span><span class="endpoint-path">/chat</span><span class="endpoint-desc">Streaming chat response</span></div>
+        <div class="endpoint"><span class="method get">GET</span><span class="endpoint-path">/api/health</span><span class="endpoint-desc">Health check & stats</span></div>
+        <div class="endpoint"><span class="method post">POST</span><span class="endpoint-path">/api/chat</span><span class="endpoint-desc">Streaming chat response</span></div>
         <div class="endpoint"><span class="method post">POST</span><span class="endpoint-path">/api/webhook</span><span class="endpoint-desc">GitHub docs webhook</span></div>
       </div>
     </div>
     <footer>
-      <div class="footer-links"><a href="https://docs.openclaw.ai" target="_blank">Documentation</a><a href="https://github.com/OpenKnots/openclaw-chat-api" target="_blank">GitHub</a><a href="/health">API Status</a></div>
+      <div class="footer-links"><a href="https://docs.openclaw.ai" target="_blank">Documentation</a><a href="https://github.com/OpenKnots/openclaw-chat-api" target="_blank">GitHub</a><a href="/api/health">API Status</a></div>
       <p class="footer-brand">Threaded by <a href="https://github.com/OpenKnots" target="_blank">OpenKnot</a></p>
     </footer>
   </div>
@@ -191,7 +193,7 @@ app.get("/", async (c) => {
     marked.setOptions({breaks:true,gfm:true,headerIds:false,mangle:false});
     const form=document.getElementById('chatForm'),input=document.getElementById('messageInput'),responseArea=document.getElementById('response'),markdownContent=document.getElementById('markdownContent'),submitBtn=document.getElementById('submitBtn');
     let rawText='';
-    form.addEventListener('submit',async e=>{e.preventDefault();const message=input.value.trim();if(!message)return;submitBtn.disabled=true;submitBtn.textContent='Thinking...';responseArea.classList.add('visible','loading');markdownContent.innerHTML='';rawText='';try{const res=await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});responseArea.classList.remove('loading');if(!res.ok){const err=await res.json();markdownContent.innerHTML='<p style="color:var(--error)">Error: '+(err.error||'Unknown error')+'</p>';return}const reader=res.body.getReader(),decoder=new TextDecoder();while(true){const{done,value}=await reader.read();if(done)break;rawText+=decoder.decode(value,{stream:true});markdownContent.innerHTML=marked.parse(rawText);responseArea.scrollTop=responseArea.scrollHeight}markdownContent.innerHTML=marked.parse(rawText)}catch(err){responseArea.classList.remove('loading');markdownContent.innerHTML='<p style="color:var(--error)">Error: '+err.message+'</p>'}finally{submitBtn.disabled=false;submitBtn.textContent='Ask'}});
+    form.addEventListener('submit',async e=>{e.preventDefault();const message=input.value.trim();if(!message)return;submitBtn.disabled=true;submitBtn.textContent='Thinking...';responseArea.classList.add('visible','loading');markdownContent.innerHTML='';rawText='';try{const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});responseArea.classList.remove('loading');if(!res.ok){const err=await res.json();markdownContent.innerHTML='<p style="color:var(--error)">Error: '+(err.error||'Unknown error')+'</p>';return}const reader=res.body.getReader(),decoder=new TextDecoder();while(true){const{done,value}=await reader.read();if(done)break;rawText+=decoder.decode(value,{stream:true});markdownContent.innerHTML=marked.parse(rawText);responseArea.scrollTop=responseArea.scrollHeight}markdownContent.innerHTML=marked.parse(rawText)}catch(err){responseArea.classList.remove('loading');markdownContent.innerHTML='<p style="color:var(--error)">Error: '+err.message+'</p>'}finally{submitBtn.disabled=false;submitBtn.textContent='Ask'}});
   </script>
 </body>
 </html>`;
@@ -200,7 +202,7 @@ app.get("/", async (c) => {
 });
 
 // Chat endpoint with streaming
-app.post("/chat", async (c) => {
+api.post("/chat", async (c) => {
   // Rate limiting
   const clientIp = getClientIp(
     Object.fromEntries(
@@ -344,6 +346,9 @@ app.post("/chat", async (c) => {
     }
   });
 });
+
+// Mount API routes under /api
+app.route("/api", api);
 
 // =============================================================================
 // Vercel Export

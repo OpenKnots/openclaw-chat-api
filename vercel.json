@@ -6,7 +6,6 @@
     { "src": "/og-image.png", "dest": "/public/og-image.png" },
     { "handle": "filesystem" },
     { "src": "/api/webhook", "dest": "/api/webhook" },
-    { "src": "/api/chat", "dest": "/api" },
     { "src": "/(.*)", "dest": "/api/" }
   ]
 }
