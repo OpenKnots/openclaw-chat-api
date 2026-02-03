@@ -3,8 +3,8 @@
  * Fetches documentation from docs.openclaw.ai/llms-full.txt,
  * chunks it, generates embeddings, and stores in Upstash Vector.
  */
-import { Embeddings } from "./embeddings.js";
-import { DocsStore, DocsChunk } from "./store-upstash.js";
+import { Embeddings } from "./embeddings";
+import { DocsStore, DocsChunk } from "./store-upstash";
 
 // Web Crypto API helpers for Edge Runtime compatibility
 async function sha256Hex(data: string): Promise<string> {

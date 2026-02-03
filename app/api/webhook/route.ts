@@ -7,27 +7,12 @@
  * 2. Create a webhook in your docs repo pointing to /api/webhook
  * 3. Select "push" events and set content type to application/json
  */
-import { Hono } from "hono";
-import { cors } from "hono/cors";
-import { handle } from "hono/vercel";
-import { HTTPException } from "hono/http-exception";
-import { indexDocs, verifyGitHubSignature, isMainBranchPush } from "../../rag/indexer.js";
+import { NextRequest, NextResponse } from "next/server";
+import { indexDocs, verifyGitHubSignature, isMainBranchPush } from "@/rag/indexer";
 
-const app = new Hono();
+export const runtime = "edge";
 
-// CORS middleware
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",").map((o) => o.trim()) ?? [];
-app.use(
-  "*",
-  cors({
-    origin: (origin) => {
-      if (!origin || allowedOrigins.length === 0) return origin ?? "*";
-      return allowedOrigins.includes(origin) ? origin : null;
-    },
-  })
-);
-
-// Store indexing status
+// Store indexing status (note: in edge runtime, this won't persist across invocations)
 let indexingStatus = {
   isIndexing: false,
   lastIndexed: null as Date | null,
@@ -43,44 +28,46 @@ let indexingStatus = {
 /**
  * GET /api/webhook - Status endpoint
  */
-app.get("/", (c) => {
-  return c.json({
+export async function GET() {
+  return NextResponse.json({
     status: "ok",
     webhook: "GitHub docs update webhook",
     isIndexing: indexingStatus.isIndexing,
     lastIndexed: indexingStatus.lastIndexed?.toISOString() || null,
     lastResult: indexingStatus.lastResult,
   });
-});
+}
 
 /**
  * POST /api/webhook - GitHub webhook handler
  */
-app.post("/", async (c) => {
+export async function POST(request: NextRequest) {
   const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET;
 
   // Verify webhook secret is configured
   if (!webhookSecret) {
     console.error("GITHUB_WEBHOOK_SECRET not configured");
-    throw new HTTPException(500, {
-      message: "Webhook not configured",
-    });
+    return NextResponse.json(
+      { error: "Webhook not configured", status: 500 },
+      { status: 500 }
+    );
   }
 
   // Get raw body for signature verification
-  const rawBody = await c.req.text();
-  const signature = c.req.header("X-Hub-Signature-256") ?? null;
-  const event = c.req.header("X-GitHub-Event") ?? null;
-  const deliveryId = c.req.header("X-GitHub-Delivery");
+  const rawBody = await request.text();
+  const signature = request.headers.get("X-Hub-Signature-256");
+  const event = request.headers.get("X-GitHub-Event");
+  const deliveryId = request.headers.get("X-GitHub-Delivery");
 
   console.log(`Webhook received: event=${event}, delivery=${deliveryId}`);
 
   // Verify signature
   if (!await verifyGitHubSignature(rawBody, signature, webhookSecret)) {
     console.error("Invalid webhook signature");
-    throw new HTTPException(401, {
-      message: "Invalid signature",
-    });
+    return NextResponse.json(
+      { error: "Invalid signature", status: 401 },
+      { status: 401 }
+    );
   }
 
   // Parse payload
@@ -88,15 +75,16 @@ app.post("/", async (c) => {
   try {
     payload = JSON.parse(rawBody);
   } catch {
-    throw new HTTPException(400, {
-      message: "Invalid JSON payload",
-    });
+    return NextResponse.json(
+      { error: "Invalid JSON payload", status: 400 },
+      { status: 400 }
+    );
   }
 
   // Handle ping event (GitHub sends this when webhook is created)
   if (event === "ping") {
     console.log("Webhook ping received");
-    return c.json({
+    return NextResponse.json({
       status: "ok",
       message: "Webhook configured successfully",
     });
@@ -105,7 +93,7 @@ app.post("/", async (c) => {
   // Check if this is a main branch push
   if (!isMainBranchPush(event, payload)) {
     console.log(`Ignoring event: ${event} (not a main branch push)`);
-    return c.json({
+    return NextResponse.json({
       status: "ignored",
       message: "Not a main branch push event",
     });
@@ -114,7 +102,7 @@ app.post("/", async (c) => {
   // Prevent concurrent indexing
   if (indexingStatus.isIndexing) {
     console.log("Indexing already in progress, skipping");
-    return c.json({
+    return NextResponse.json({
       status: "skipped",
       message: "Indexing already in progress",
     });
@@ -133,7 +121,7 @@ app.post("/", async (c) => {
 
     if (result.success) {
       console.log(`Indexing complete: ${result.chunksCreated} chunks from ${result.pagesProcessed} pages`);
-      return c.json({
+      return NextResponse.json({
         status: "success",
         message: "Documentation re-indexed successfully",
         result: {
@@ -144,29 +132,22 @@ app.post("/", async (c) => {
       });
     } else {
       console.error("Indexing failed:", result.errors);
-      return c.json({
-        status: "error",
-        message: "Indexing failed",
-        errors: result.errors,
-      }, 500);
+      return NextResponse.json(
+        {
+          status: "error",
+          message: "Indexing failed",
+          errors: result.errors,
+        },
+        { status: 500 }
+      );
     }
   } catch (error) {
     indexingStatus.isIndexing = false;
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("Indexing error:", error);
-    throw new HTTPException(500, {
-      message: `Indexing failed: ${errorMessage}`,
-    });
+    return NextResponse.json(
+      { error: `Indexing failed: ${errorMessage}`, status: 500 },
+      { status: 500 }
+    );
   }
-});
-
-// Use Edge Runtime for Web API Request compatibility with Hono
-export const config = {
-  runtime: 'edge',
-};
-
-// Export handlers for Vercel
-const handler = handle(app);
-export const GET = handler;
-export const POST = handler;
-export default handler;
+}

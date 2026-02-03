@@ -1,5 +1,7 @@
 # OpenClaw Docs Agent API
 
+![OpenClaw Docs Agent](public/og-image.png)
+
 AI-powered documentation chatbot API for [OpenClaw](https://openclaw.ai) and threaded by [OpenKnot](https://openknot.ai). 
 
 This powers the embedded docs agent that helps users navigate and understand OpenClaw's documentation through natural conversation.

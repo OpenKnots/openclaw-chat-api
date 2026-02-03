@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "RAG-based docs chat API for OpenClaw documentation",
-  "author": "OpenKnot AI",
+  "author": "OpenKnot AI <val@openknot.ai>",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -12,10 +12,12 @@
   "bugs": {
     "url": "https://github.com/OpenKnots/openclaw-chat-api/issues"
   },
-  "type": "module",
   "scripts": {
-    "dev": "bun run --watch dev-server.ts",
-    "start": "bun run dev-server.ts",
+    "bdev": "next build && next dev",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
     "build:index": "bun build-vector-index.ts",
     "deploy": "vercel"
   },
@@ -24,12 +26,17 @@
     "@upstash/redis": "^1.36.2",
     "@upstash/vector": "^1.2.2",
     "@vercel/analytics": "^1.6.1",
-    "hono": "^4.11.7",
-    "openai": "^6.17.0"
+    "next": "^16.1.6",
+    "openai": "^6.17.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-markdown": "^10.1.0"
   },
   "devDependencies": {
     "@types/bun": "^1.3.8",
-    "@vercel/node": "^5.5.28",
+    "@types/node": "^22.19.8",
+    "@types/react": "^19.2.10",
+    "@types/react-dom": "^19.2.3",
     "typescript": "^5.9.3"
   }
 }

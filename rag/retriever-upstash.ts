@@ -2,8 +2,8 @@
  * Hybrid retriever for docs-chat RAG pipeline (Upstash Vector version).
  * Combines vector similarity with keyword boosting for improved relevance.
  */
-import { Embeddings } from "./embeddings.js";
-import { DocsStore, type DocsChunk, type SearchResult } from "./store-upstash.js";
+import { Embeddings } from "./embeddings";
+import { DocsStore, type DocsChunk, type SearchResult } from "./store-upstash";
 
 export interface RetrievalResult {
   chunk: Omit<DocsChunk, "vector">;
@@ -14,7 +14,7 @@ export class Retriever {
   constructor(
     private readonly store: DocsStore,
     private readonly embeddings: Embeddings,
-  ) {}
+  ) { }
 
   /**
    * Retrieve relevant chunks using hybrid scoring:
