@@ -25,6 +25,7 @@ interface ChunkMetadata {
   title: string;
   content: string;
   url: string;
+  [key: string]: unknown; // Index signature for Upstash Dict compatibility
 }
 
 // Upstash Vector has a limit of 1000 vectors per upsert batch
