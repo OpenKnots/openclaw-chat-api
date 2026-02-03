@@ -1,6 +1,16 @@
-# OpenClaw Chat API
+# OpenClaw Docs Agent API
 
-RAG-based documentation chat API for [OpenClaw](https://openclaw.org). Uses vector search to retrieve relevant documentation chunks and streams AI-generated answers.
+AI-powered documentation chatbot API for [OpenClaw](https://openclaw.ai) and threaded by [OpenKnot](https://openknot.ai). 
+
+This powers the embedded docs agent that helps users navigate and understand OpenClaw's documentation through natural conversation.
+
+## Overview
+
+This API serves as the backend for OpenClaw's docs chat widget. It uses RAG (Retrieval-Augmented Generation) to:
+
+1. Index OpenClaw documentation into a vector store
+2. Retrieve relevant docs based on user questions
+3. Stream AI-generated answers with context from the documentation
 
 ## Stack
 
@@ -25,7 +35,7 @@ RAG-based documentation chat API for [OpenClaw](https://openclaw.org). Uses vect
 }
 ```
 
-Returns a streaming `text/plain` response with the AI-generated answer.
+Returns a streaming `text/plain` response with an AI-generated answer grounded in OpenClaw documentation.
 
 ## Setup
 
