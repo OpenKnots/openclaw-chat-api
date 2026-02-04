@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { DocsStore } from "@/rag/store-upstash";
 import ChatForm from "@/app/components/chat-form";
 
@@ -16,20 +17,22 @@ export default async function Home() {
 
   return (
     <div className="container">
-      <header>
-        <div className="logo">
-          <svg
-            viewBox="0 0 100 100"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="4"
-          >
-            <circle cx="50" cy="50" r="40" />
-            <path d="M30 50 Q50 25 70 50 Q50 75 30 50" strokeWidth="3" />
-          </svg>
+      <header className="hero-header">
+        <div className="logo-mark">
+          <Image
+            src="/openknots-logo.png"
+            alt="OpenKnots Logo"
+            width={40}
+            height={40}
+            priority
+          />
         </div>
-        <h1>OpenClaw</h1>
-        <p className="subtitle">Documentation Assistant</p>
+        <div className="hero-text">
+          <h1>OpenClaw</h1>
+          <span className="hero-sep">/</span>
+          <span className="hero-tag">Hybrid Search</span>
+        </div>
+        <span className="hero-badge">by OpenKnots</span>
       </header>
 
       <div className="status-bar">
@@ -52,7 +55,7 @@ export default async function Home() {
         </div>
       </div>
 
-      <div className="glass-card endpoints-section">
+      {/* <div className="glass-card endpoints-section">
         <div className="chat-header">
           <h2>API Reference</h2>
         </div>
@@ -73,24 +76,19 @@ export default async function Home() {
             <span className="endpoint-desc">GitHub docs webhook</span>
           </div>
         </div>
-      </div>
+      </div> */}
 
       <footer>
-        <div className="footer-links">
-          <a href="https://docs.openclaw.ai" target="_blank" rel="noopener noreferrer">
-            Documentation
-          </a>
-          <a href="https://github.com/OpenKnots/openclaw-chat-api" target="_blank" rel="noopener noreferrer">
-            GitHub
-          </a>
-          <a href="/api/health">API Status</a>
-        </div>
-        <p className="footer-brand">
-          Threaded by{" "}
-          <a href="https://github.com/OpenKnots" target="_blank" rel="noopener noreferrer">
-            OpenKnot
-          </a>
-        </p>
+        <a href="https://github.com/OpenKnots" className="footer-brand" target="_blank" rel="noopener noreferrer">
+          <Image src="/openknots-logo.png" alt="OpenKnots" width={20} height={20} />
+          <span>OpenKnots</span>
+        </a>
+        <nav className="footer-nav">
+          <a href="https://docs.openclaw.ai" target="_blank" rel="noopener noreferrer">Docs</a>
+          <a href="https://github.com/OpenKnots/openclaw-chat-api" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="/api/health">Status</a>
+        </nav>
+        <span className="footer-copy">MIT License</span>
       </footer>
     </div>
   );

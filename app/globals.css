@@ -8,10 +8,12 @@
   --text-secondary: #a1a1a1;
   --text-muted: #666;
   --accent: #fff;
+  --accent-silver: #c0c0c0;
   --success: #4ade80;
   --error: #f87171;
   --radius: 16px;
   --radius-sm: 8px;
+  --glow-silver: 0 0 20px rgba(192, 192, 192, 0.15);
 }
 
 * {
@@ -34,10 +36,8 @@ body::before {
   content: "";
   position: fixed;
   inset: 0;
-  background-image: linear-gradient(
-      rgba(255, 255, 255, 0.02) 1px,
-      transparent 1px
-    ),
+  background-image: linear-gradient(rgba(255, 255, 255, 0.02) 1px,
+      transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
   background-size: 60px 60px;
   pointer-events: none;
@@ -45,44 +45,94 @@ body::before {
 }
 
 .container {
-  max-width: 720px;
+  max-width: 936px;
   margin: 0 auto;
-  padding: 3rem 1.5rem;
+  padding: 10rem 2rem;
 }
 
-header {
-  text-align: center;
-  margin-bottom: 3rem;
+/* Hero Header - Compact Glassmorphic */
+.hero-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.875rem 1.25rem;
+  margin-bottom: 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
-.logo {
-  display: inline-flex;
+.logo-mark {
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 64px;
-  margin-bottom: 1.5rem;
-  border: 1px solid var(--glass-border);
-  border-radius: 16px;
-  background: var(--glass-bg);
-  backdrop-filter: blur(10px);
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  transition: transform 0.2s ease, background 0.2s ease;
 }
 
-.logo svg {
-  width: 32px;
-  height: 32px;
+.logo-mark:hover {
+  transform: scale(1.04);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.logo-mark img {
+  border-radius: 6px;
+}
+
+.hero-text {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex: 1;
+  min-width: 0;
 }
 
 h1 {
-  font-size: 2rem;
+  font-size: 1.25rem;
   font-weight: 600;
-  letter-spacing: -0.03em;
-  margin-bottom: 0.5rem;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  white-space: nowrap;
 }
 
+.hero-sep {
+  color: rgba(255, 255, 255, 0.15);
+  font-weight: 300;
+  font-size: 1rem;
+}
+
+.hero-tag {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.hero-badge {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  padding: 0.35rem 0.65rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Legacy subtitle - kept for compatibility */
 .subtitle {
   color: var(--text-secondary);
   font-size: 0.95rem;
+  letter-spacing: 0.02em;
 }
 
 .status-bar {
@@ -91,7 +141,7 @@ h1 {
   justify-content: center;
   gap: 2rem;
   padding: 1rem 1.5rem;
-  margin-bottom: 2rem;
+  margin-bottom: 0.75rem;
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius);
@@ -139,7 +189,7 @@ h1 {
 }
 
 .chat-section {
-  margin-bottom: 2rem;
+  margin-bottom: 0.75rem;
 }
 
 .chat-header {
@@ -254,19 +304,19 @@ h1 {
 }
 
 .chat-btn {
-  padding: 0.875rem 1.5rem;
-  background: var(--accent);
+  padding: 0.5rem 0.75rem;
   border: none;
   border-radius: var(--radius-sm);
-  color: var(--bg-primary);
-  font-size: 0.9rem;
-  font-weight: 600;
+  background-color: rgba(255, 78, 64, 0.1);
+  color: #FF4E40;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
   cursor: pointer;
-  transition: all 0.2s;
 }
 
 .chat-btn:hover {
-  opacity: 0.9;
+  background-color: rgba(255, 78, 64, 0.2);
   transform: translateY(-1px);
 }
 
@@ -277,14 +327,14 @@ h1 {
 }
 
 .response-area {
-  margin-top: 1.5rem;
+  margin-top: 1.2rem;
   padding: 1.25rem 1.5rem;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-sm);
   display: none;
   min-height: 120px;
-  max-height: 500px;
+  max-height: 936px;
   overflow-y: auto;
 }
 
@@ -361,7 +411,7 @@ h1 {
 }
 
 .endpoints-section {
-  margin-bottom: 2rem;
+  margin-bottom: 0.75rem;
 }
 
 .endpoint-list {
@@ -416,39 +466,62 @@ h1 {
   color: var(--text-muted);
 }
 
+/* Footer - Compact Inline */
 footer {
-  text-align: center;
-  padding: 2rem 0;
-  border-top: 1px solid var(--glass-border);
-}
-
-.footer-links {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 1.5rem;
-  margin-bottom: 0.75rem;
-}
-
-.footer-links a {
-  color: var(--text-secondary);
-  text-decoration: none;
-  font-size: 0.85rem;
-  transition: color 0.2s;
-}
-
-.footer-links a:hover {
-  color: var(--text-primary);
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  margin-top: 2rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  text-decoration: none;
   font-size: 0.8rem;
-  color: var(--text-muted);
+  font-weight: 500;
+  transition: color 0.2s;
 }
 
-.footer-brand a {
+.footer-brand:hover {
+  color: var(--text-primary);
+}
+
+.footer-brand img {
+  border-radius: 4px;
+  opacity: 0.8;
+}
+
+.footer-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.footer-nav a {
   color: var(--text-muted);
   text-decoration: none;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.footer-nav a:hover {
+  color: var(--text-primary);
+}
+
+.footer-copy {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  opacity: 0.6;
 }
 
 /* Tablet breakpoint */
@@ -475,6 +548,40 @@ footer {
 @media (max-width: 540px) {
   .container {
     padding: 2rem 1rem;
+  }
+
+  .hero-header {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .hero-text {
+    order: 1;
+    flex-basis: 100%;
+    justify-content: center;
+  }
+
+  .logo-mark {
+    width: 36px;
+    height: 36px;
+  }
+
+  .logo-mark img {
+    width: 32px;
+    height: 32px;
+  }
+
+  h1 {
+    font-size: 1.1rem;
+  }
+
+  .hero-tag {
+    font-size: 0.75rem;
+  }
+
+  .hero-badge {
+    font-size: 0.65rem;
   }
 
   .status-bar {
@@ -512,6 +619,23 @@ footer {
 
   .endpoint-desc {
     text-align: left;
+  }
+
+  footer {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: center;
+  }
+
+  .footer-nav {
+    order: -1;
+    flex-basis: 100%;
+    justify-content: center;
+    gap: 1rem;
+  }
+
+  .footer-copy {
+    display: none;
   }
 }
 

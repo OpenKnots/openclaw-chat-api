@@ -6,19 +6,19 @@ import ReactMarkdown from "react-markdown";
 const MAX_MESSAGE_LENGTH = 2000;
 
 const AVAILABLE_MODELS = [
-  { id: "gpt-5-nano", name: "GPT-5 nano", description: "Cheapest" },
-  { id: "gpt-4.1-nano", name: "GPT-4.1 nano", description: "Great with retrieval" },
-  { id: "gpt-4.1-mini", name: "GPT-4.1 mini", description: "Fast & capable" },
-  { id: "gpt-4o-mini", name: "GPT-4o mini", description: "Quality/latency/value" },
-  { id: "gpt-5-mini", name: "GPT-5 mini", description: "Better headroom" },
-  { id: "gpt-5.2", name: "GPT-5.2", description: "Hard questions" },
+  { id: "gpt-5-nano", name: "GPT-5 nano", description: "Cheapest, Fast, Hybrid" },
+  { id: "gpt-4.1-nano", name: "GPT-4.1 nano", description: "Retrieval, Optimized, Hybrid" },
+  { id: "gpt-4.1-mini", name: "GPT-4.1 mini", description: "Fast, Capable, Hybrid" },
+  { id: "gpt-4o-mini", name: "GPT-4o mini", description: "Quality, Latency, Value" },
+  { id: "gpt-5-mini", name: "GPT-5 mini", description: "Headroom, Better, Hybrid" },
+  { id: "gpt-5.2", name: "GPT-5.2", description: "Complex, Questions, Hybrid" },
 ] as const;
 
 const RETRIEVAL_STRATEGIES = [
-  { id: "auto", name: "Auto", description: "Best for query" },
-  { id: "hybrid", name: "Hybrid", description: "Semantic + Keyword" },
-  { id: "semantic", name: "Semantic", description: "Meaning-based" },
-  { id: "keyword", name: "Keyword", description: "Exact match" },
+  { id: "auto", name: "Auto", description: "Query, Retrieval, Hybrid" },
+  { id: "hybrid", name: "Hybrid", description: "Semantic, Keyword, Hybrid" },
+  { id: "semantic", name: "Semantic", description: "Meaning, Semantic" },
+  { id: "keyword", name: "Keyword", description: "Exact Match, Keywords, Keyword" },
 ] as const;
 
 type ModelId = (typeof AVAILABLE_MODELS)[number]["id"];
@@ -29,7 +29,7 @@ export default function ChatForm() {
   const [response, setResponse] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<ModelId>("gpt-4o-mini");
+  const [selectedModel, setSelectedModel] = useState<ModelId>("gpt-4.1-mini");
   const [selectedStrategy, setSelectedStrategy] = useState<RetrievalStrategy>("auto");
   const responseRef = useRef<HTMLDivElement>(null);
 
@@ -104,7 +104,7 @@ export default function ChatForm() {
           >
             {AVAILABLE_MODELS.map((model) => (
               <option key={model.id} value={model.id}>
-                {model.name} — {model.description}
+                {model.name} ({model.description})
               </option>
             ))}
           </select>
@@ -122,7 +122,7 @@ export default function ChatForm() {
           >
             {RETRIEVAL_STRATEGIES.map((strategy) => (
               <option key={strategy.id} value={strategy.id}>
-                {strategy.name} — {strategy.description}
+                {strategy.name} ({strategy.description})
               </option>
             ))}
           </select>
@@ -140,7 +140,7 @@ export default function ChatForm() {
           onChange={(e) => setMessage(e.target.value)}
         />
         <button type="submit" className="chat-btn" disabled={isLoading}>
-          {isLoading ? `${currentModel?.name}...` : "Ask"}
+          {isLoading ? `${currentModel?.name}...` : "Ask Molty 🦞"}
         </button>
       </form>
       <div
