@@ -24,7 +24,7 @@ const MAX_MESSAGE_LENGTH = 2000;
 const ENABLE_HYBRID = process.env.ENABLE_HYBRID_SEARCH === "true";
 
 const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "https://claw.openknot.ai",
+  "Access-Control-Allow-Origin": "https://docs.openclaw.ai",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
