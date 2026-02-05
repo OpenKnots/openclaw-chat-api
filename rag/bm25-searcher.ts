@@ -286,9 +286,10 @@ export function serializeTermIndex(index: TermIndex): string {
 
 /**
  * Deserialize term index from Upstash KV storage.
+ * Handles both string (needs parsing) and object (already parsed by Upstash) inputs.
  */
-export function deserializeTermIndex(data: string): TermIndex {
-  const parsed = JSON.parse(data);
+export function deserializeTermIndex(data: string | object): TermIndex {
+  const parsed = typeof data === "string" ? JSON.parse(data) : data;
   return {
     terms: new Map(parsed.terms),
     docLengths: new Map(parsed.docLengths),
@@ -328,7 +329,8 @@ export async function loadTermIndex(): Promise<TermIndex | null> {
   }
 
   const redis = new Redis({ url, token });
-  const data = await redis.get<string>("bm25:index");
+  // Upstash may return parsed JSON object or string depending on how it was stored
+  const data = await redis.get<string | object>("bm25:index");
 
   if (!data) {
     return null;
