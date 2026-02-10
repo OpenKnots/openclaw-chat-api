@@ -26,6 +26,7 @@ const ENABLE_HYBRID = process.env.ENABLE_HYBRID_SEARCH === "true";
 const ALLOWED_ORIGINS = [
   "https://docs.openclaw.ai",
   "https://claw.openknot.ai",
+  "https://claw-docs.openknot.ai",
 ];
 
 function getCorsHeaders(request: Request) {
@@ -134,12 +135,9 @@ export async function POST(request: NextRequest) {
     // Parse body
     let message = "";
     const ALLOWED_MODELS = [
-      "gpt-5-nano",
       "gpt-4.1-nano",
       "gpt-4.1-mini",
       "gpt-4o-mini",
-      "gpt-5-mini",
-      "gpt-5.2",
     ];
     const ALLOWED_STRATEGIES = ["auto", "hybrid", "semantic", "keyword"] as const;
     type UserStrategy = (typeof ALLOWED_STRATEGIES)[number];
