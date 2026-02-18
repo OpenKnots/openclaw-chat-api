@@ -4,7 +4,7 @@
  */
 import { indexDocs } from "./rag/indexer";
 
-console.log("🚀 Starting documentation indexing...\n");
+console.log("🦞 Starting documentation indexing...\n");
 
 const result = await indexDocs();
 
