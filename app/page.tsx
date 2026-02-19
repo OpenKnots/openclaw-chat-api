@@ -14,7 +14,6 @@ async function getStatus() {
 
 export default async function Home() {
   const status = await getStatus();
-
   return (
     <div className="container">
       <header className="hero-header">
