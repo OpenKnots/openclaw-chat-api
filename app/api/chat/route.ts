@@ -25,6 +25,7 @@ const ENABLE_HYBRID = process.env.ENABLE_HYBRID_SEARCH === "true";
 
 const ALLOWED_ORIGINS = [
   "https://docs.openclaw.ai",
+  "https://claw-docs.openknot.ai",
 ];
 
 function getCorsHeaders(request: Request) {
