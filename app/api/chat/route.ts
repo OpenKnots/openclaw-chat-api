@@ -25,14 +25,12 @@ const ENABLE_HYBRID = process.env.ENABLE_HYBRID_SEARCH === "true";
 
 const ALLOWED_ORIGINS = [
   "https://docs.openclaw.ai",
-  "https://claw.openknot.ai",
-  "https://claw-docs.openknot.ai",
 ];
 
 function getCorsHeaders(request: Request) {
   const origin = request.headers.get("Origin");
   const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : "";
-  
+
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -135,17 +133,19 @@ export async function POST(request: NextRequest) {
     // Parse body
     let message = "";
     const ALLOWED_MODELS = [
-      "gpt-4.1-nano",
-      "gpt-4.1-mini",
-      "gpt-4o-mini",
+      "gpt-5-nano",
+      "gpt-5-mini",
+      "gpt-5",
+      "gpt-5.1",
+      "gpt-5.2",
     ];
     const ALLOWED_STRATEGIES = ["auto", "hybrid", "semantic", "keyword"] as const;
     type UserStrategy = (typeof ALLOWED_STRATEGIES)[number];
-    
-    const defaultModel = process.env.DEFAULT_CHAT_MODEL || "gpt-4o-mini";
+
+    const defaultModel = process.env.DEFAULT_CHAT_MODEL || "gpt-5-mini";
     let model = ALLOWED_MODELS.includes(defaultModel)
       ? defaultModel
-      : "gpt-4o-mini";
+      : "gpt-5-mini";
     let userStrategy: UserStrategy = "auto";
 
     try {
@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
 
     // Classify query for optimal retrieval strategy
     const classified: ClassifiedQuery = classifyQuery(trimmedMessage);
-    
+
     // Override strategy if user explicitly selected one (not "auto")
     if (userStrategy !== "auto") {
       classified.strategy = userStrategy;
@@ -260,7 +260,7 @@ export async function POST(request: NextRequest) {
 
       // Fuse results based on strategy
       let fusedResults: FusedResult[];
-      
+
       if (classified.strategy === "hybrid" && keywordResults.length > 0 && semanticResults.length > 0) {
         // Hybrid: combine both using RRF
         fusedResults = reciprocalRankFusion(

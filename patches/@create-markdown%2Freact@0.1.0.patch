@@ -1,0 +1,344 @@
+diff --git a/node_modules/@create-markdown/react/.bun-tag-56454130e9bd8399 b/.bun-tag-56454130e9bd8399
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/dist/index.cjs b/dist/index.cjs
+index 6165b377ae938873d06cfee97e1c71c87a5538f0..e73848ddf73209bb4e006bead1b05f663258e869 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -62,15 +62,16 @@ __export(exports_src, {
+ module.exports = __toCommonJS(exports_src);
+ 
+ // src/block-renderer.tsx
+-var jsx_dev_runtime = require("react/jsx-dev-runtime");
++var _jsx_runtime = require("react/jsx-runtime");
++var jsx_dev_runtime = { jsx: function(t, p, k, s) { return s ? _jsx_runtime.jsxs(t, p, k) : _jsx_runtime.jsx(t, p, k); }, Fragment: _jsx_runtime.Fragment };
+ function BlockRenderer({
+   blocks,
+   className,
+   customRenderers
+ }) {
+-  return /* @__PURE__ */ jsx_dev_runtime.jsxDEV("div", {
++  return /* @__PURE__ */ jsx_dev_runtime.jsx("div", {
+     className,
+-    children: blocks.map((block) => /* @__PURE__ */ jsx_dev_runtime.jsxDEV(BlockElement, {
++    children: blocks.map((block) => /* @__PURE__ */ jsx_dev_runtime.jsx(BlockElement, {
+       block,
+       customRenderers
+     }, block.id, false, undefined, this))
+@@ -82,53 +83,53 @@ function BlockElement({
+ }) {
+   const CustomRenderer = customRenderers?.[block.type];
+   if (CustomRenderer) {
+-    return /* @__PURE__ */ jsx_dev_runtime.jsxDEV(CustomRenderer, {
++    return /* @__PURE__ */ jsx_dev_runtime.jsx(CustomRenderer, {
+       block
+     }, undefined, false, undefined, this);
+   }
+   switch (block.type) {
+     case "paragraph":
+-      return /* @__PURE__ */ jsx_dev_runtime.jsxDEV(ParagraphRenderer, {
++      return /* @__PURE__ */ jsx_dev_runtime.jsx(ParagraphRenderer, {
+         block
+       }, undefined, false, undefined, this);
+     case "heading":
+-      return /* @__PURE__ */ jsx_dev_runtime.jsxDEV(HeadingRenderer, {
++      return /* @__PURE__ */ jsx_dev_runtime.jsx(HeadingRenderer, {
+         block
+       }, undefined, false, undefined, this);
+     case "bulletList":
+-      return /* @__PURE__ */ jsx_dev_runtime.jsxDEV(BulletListRenderer, {
++      return /* @__PURE__ */ jsx_dev_runtime.jsx(BulletListRenderer, {
+         block,
+         customRenderers
+       }, undefined, false, undefined, this);
+     case "numberedList":
+-      return /* @__PURE__ */ jsx_dev_runtime.jsxDEV(NumberedListRenderer, {
++      return /* @__PURE__ */ jsx_dev_runtime.jsx(NumberedListRenderer, {
+         block,
+         customRenderers
+       }, undefined, false, undefined, this);
+     case "checkList":
+-      return /* @__PURE__ */ jsx_dev_runtime.jsxDEV(CheckListRenderer, {
++      return /* @__PURE__ */ jsx_dev_runtime.jsx(CheckListRenderer, {
+         block
+       }, undefined, false, undefined, this);
+     case "codeBlock":
+-      return /* @__PURE__ */ jsx_dev_runtime.jsxDEV(CodeBlockRenderer, {
++      return /* @__PURE__ */ jsx_dev_runtime.jsx(CodeBlockRenderer, {
+         block
+       }, undefined, false, undefined, this);
+     case "blockquote":
+-      return /* @__PURE__ */ jsx_dev_runtime.jsxDEV(BlockquoteRenderer, {
++      return /* @__PURE__ */ jsx_dev_runtime.jsx(BlockquoteRenderer, {
+         block
+       }, undefined, false, undefined, this);
+     case "table":
+-      return /* @__PURE__ */ jsx_dev_runtime.jsxDEV(TableRenderer, {
++      return /* @__PURE__ */ jsx_dev_runtime.jsx(TableRenderer, {
+         block
+       }, undefined, false, undefined, this);
+     case "image":
+-      return /* @__PURE__ */ jsx_dev_runtime.jsxDEV(ImageRenderer, {
++      return /* @__PURE__ */ jsx_dev_runtime.jsx(ImageRenderer, {
+         block
+       }, undefined, false, undefined, this);
+     case "divider":
+-      return /* @__PURE__ */ jsx_dev_runtime.jsxDEV(DividerRenderer, {}, undefined, false, undefined, this);
++      return /* @__PURE__ */ jsx_dev_runtime.jsx(DividerRenderer, {}, undefined, false, undefined, this);
+     case "callout":
+-      return /* @__PURE__ */ jsx_dev_runtime.jsxDEV(CalloutRenderer, {
++      return /* @__PURE__ */ jsx_dev_runtime.jsx(CalloutRenderer, {
+         block
+       }, undefined, false, undefined, this);
+     default:
+@@ -136,8 +137,8 @@ function BlockElement({
+   }
+ }
+ function InlineContent({ spans }) {
+-  return /* @__PURE__ */ jsx_dev_runtime.jsxDEV(jsx_dev_runtime.Fragment, {
+-    children: spans.map((span, index) => /* @__PURE__ */ jsx_dev_runtime.jsxDEV(SpanElement, {
++  return /* @__PURE__ */ jsx_dev_runtime.jsx(jsx_dev_runtime.Fragment, {
++    children: spans.map((span, index) => /* @__PURE__ */ jsx_dev_runtime.jsx(SpanElement, {
+       span
+     }, index, false, undefined, this))
+   }, undefined, false, undefined, this);
+@@ -146,57 +147,57 @@ function SpanElement({ span }) {
+   let content = span.text;
+   const styles = span.styles;
+   if (styles.code) {
+-    content = /* @__PURE__ */ jsx_dev_runtime.jsxDEV("code", {
++    content = /* @__PURE__ */ jsx_dev_runtime.jsx("code", {
+       children: content
+     }, undefined, false, undefined, this);
+   }
+   if (styles.highlight) {
+-    content = /* @__PURE__ */ jsx_dev_runtime.jsxDEV("mark", {
++    content = /* @__PURE__ */ jsx_dev_runtime.jsx("mark", {
+       children: content
+     }, undefined, false, undefined, this);
+   }
+   if (styles.strikethrough) {
+-    content = /* @__PURE__ */ jsx_dev_runtime.jsxDEV("del", {
++    content = /* @__PURE__ */ jsx_dev_runtime.jsx("del", {
+       children: content
+     }, undefined, false, undefined, this);
+   }
+   if (styles.underline) {
+-    content = /* @__PURE__ */ jsx_dev_runtime.jsxDEV("u", {
++    content = /* @__PURE__ */ jsx_dev_runtime.jsx("u", {
+       children: content
+     }, undefined, false, undefined, this);
+   }
+   if (styles.italic) {
+-    content = /* @__PURE__ */ jsx_dev_runtime.jsxDEV("em", {
++    content = /* @__PURE__ */ jsx_dev_runtime.jsx("em", {
+       children: content
+     }, undefined, false, undefined, this);
+   }
+   if (styles.bold) {
+-    content = /* @__PURE__ */ jsx_dev_runtime.jsxDEV("strong", {
++    content = /* @__PURE__ */ jsx_dev_runtime.jsx("strong", {
+       children: content
+     }, undefined, false, undefined, this);
+   }
+   if (styles.link) {
+-    content = /* @__PURE__ */ jsx_dev_runtime.jsxDEV("a", {
++    content = /* @__PURE__ */ jsx_dev_runtime.jsx("a", {
+       href: styles.link.url,
+       title: styles.link.title,
+       children: content
+     }, undefined, false, undefined, this);
+   }
+-  return /* @__PURE__ */ jsx_dev_runtime.jsxDEV(jsx_dev_runtime.Fragment, {
++  return /* @__PURE__ */ jsx_dev_runtime.jsx(jsx_dev_runtime.Fragment, {
+     children: content
+   }, undefined, false, undefined, this);
+ }
+ function ParagraphRenderer({ block }) {
+-  return /* @__PURE__ */ jsx_dev_runtime.jsxDEV("p", {
+-    children: /* @__PURE__ */ jsx_dev_runtime.jsxDEV(InlineContent, {
++  return /* @__PURE__ */ jsx_dev_runtime.jsx("p", {
++    children: /* @__PURE__ */ jsx_dev_runtime.jsx(InlineContent, {
+       spans: block.content
+     }, undefined, false, undefined, this)
+   }, undefined, false, undefined, this);
+ }
+ function HeadingRenderer({ block }) {
+   const Tag = `h${block.props.level}`;
+-  return /* @__PURE__ */ jsx_dev_runtime.jsxDEV(Tag, {
+-    children: /* @__PURE__ */ jsx_dev_runtime.jsxDEV(InlineContent, {
++  return /* @__PURE__ */ jsx_dev_runtime.jsx(Tag, {
++    children: /* @__PURE__ */ jsx_dev_runtime.jsx(InlineContent, {
+       spans: block.content
+     }, undefined, false, undefined, this)
+   }, undefined, false, undefined, this);
+@@ -205,13 +206,13 @@ function BulletListRenderer({
+   block,
+   customRenderers
+ }) {
+-  return /* @__PURE__ */ jsx_dev_runtime.jsxDEV("ul", {
+-    children: block.children.map((child) => /* @__PURE__ */ jsx_dev_runtime.jsxDEV("li", {
++  return /* @__PURE__ */ jsx_dev_runtime.jsx("ul", {
++    children: block.children.map((child) => /* @__PURE__ */ jsx_dev_runtime.jsx("li", {
+       children: [
+-        /* @__PURE__ */ jsx_dev_runtime.jsxDEV(InlineContent, {
++        /* @__PURE__ */ jsx_dev_runtime.jsx(InlineContent, {
+           spans: child.content
+         }, undefined, false, undefined, this),
+-        child.children.length > 0 && /* @__PURE__ */ jsx_dev_runtime.jsxDEV(BlockElement, {
++        child.children.length > 0 && /* @__PURE__ */ jsx_dev_runtime.jsx(BlockElement, {
+           block: child,
+           customRenderers
+         }, undefined, false, undefined, this)
+@@ -223,13 +224,13 @@ function NumberedListRenderer({
+   block,
+   customRenderers
+ }) {
+-  return /* @__PURE__ */ jsx_dev_runtime.jsxDEV("ol", {
+-    children: block.children.map((child) => /* @__PURE__ */ jsx_dev_runtime.jsxDEV("li", {
++  return /* @__PURE__ */ jsx_dev_runtime.jsx("ol", {
++    children: block.children.map((child) => /* @__PURE__ */ jsx_dev_runtime.jsx("li", {
+       children: [
+-        /* @__PURE__ */ jsx_dev_runtime.jsxDEV(InlineContent, {
++        /* @__PURE__ */ jsx_dev_runtime.jsx(InlineContent, {
+           spans: child.content
+         }, undefined, false, undefined, this),
+-        child.children.length > 0 && /* @__PURE__ */ jsx_dev_runtime.jsxDEV(BlockElement, {
++        child.children.length > 0 && /* @__PURE__ */ jsx_dev_runtime.jsx(BlockElement, {
+           block: child,
+           customRenderers
+         }, undefined, false, undefined, this)
+@@ -238,18 +239,18 @@ function NumberedListRenderer({
+   }, undefined, false, undefined, this);
+ }
+ function CheckListRenderer({ block }) {
+-  return /* @__PURE__ */ jsx_dev_runtime.jsxDEV("div", {
++  return /* @__PURE__ */ jsx_dev_runtime.jsx("div", {
+     style: { display: "flex", alignItems: "flex-start", gap: "0.5rem" },
+     children: [
+-      /* @__PURE__ */ jsx_dev_runtime.jsxDEV("input", {
++      /* @__PURE__ */ jsx_dev_runtime.jsx("input", {
+         type: "checkbox",
+         checked: block.props.checked,
+         readOnly: true,
+         style: { marginTop: "0.25rem" }
+       }, undefined, false, undefined, this),
+-      /* @__PURE__ */ jsx_dev_runtime.jsxDEV("span", {
++      /* @__PURE__ */ jsx_dev_runtime.jsx("span", {
+         style: { textDecoration: block.props.checked ? "line-through" : "none" },
+-        children: /* @__PURE__ */ jsx_dev_runtime.jsxDEV(InlineContent, {
++        children: /* @__PURE__ */ jsx_dev_runtime.jsx(InlineContent, {
+           spans: block.content
+         }, undefined, false, undefined, this)
+       }, undefined, false, undefined, this)
+@@ -259,16 +260,16 @@ function CheckListRenderer({ block }) {
+ function CodeBlockRenderer({ block }) {
+   const code = block.content.map((span) => span.text).join("");
+   const language = block.props.language;
+-  return /* @__PURE__ */ jsx_dev_runtime.jsxDEV("pre", {
+-    children: /* @__PURE__ */ jsx_dev_runtime.jsxDEV("code", {
++  return /* @__PURE__ */ jsx_dev_runtime.jsx("pre", {
++    children: /* @__PURE__ */ jsx_dev_runtime.jsx("code", {
+       className: language ? `language-${language}` : undefined,
+       children: code
+     }, undefined, false, undefined, this)
+   }, undefined, false, undefined, this);
+ }
+ function BlockquoteRenderer({ block }) {
+-  return /* @__PURE__ */ jsx_dev_runtime.jsxDEV("blockquote", {
+-    children: /* @__PURE__ */ jsx_dev_runtime.jsxDEV(InlineContent, {
++  return /* @__PURE__ */ jsx_dev_runtime.jsx("blockquote", {
++    children: /* @__PURE__ */ jsx_dev_runtime.jsx(InlineContent, {
+       spans: block.content
+     }, undefined, false, undefined, this)
+   }, undefined, false, undefined, this);
+@@ -278,19 +279,19 @@ function TableRenderer({ block }) {
+   const getAlignment = (index) => {
+     return alignments?.[index] ?? undefined;
+   };
+-  return /* @__PURE__ */ jsx_dev_runtime.jsxDEV("table", {
++  return /* @__PURE__ */ jsx_dev_runtime.jsx("table", {
+     children: [
+-      headers.length > 0 && /* @__PURE__ */ jsx_dev_runtime.jsxDEV("thead", {
+-        children: /* @__PURE__ */ jsx_dev_runtime.jsxDEV("tr", {
+-          children: headers.map((header, i) => /* @__PURE__ */ jsx_dev_runtime.jsxDEV("th", {
++      headers.length > 0 && /* @__PURE__ */ jsx_dev_runtime.jsx("thead", {
++        children: /* @__PURE__ */ jsx_dev_runtime.jsx("tr", {
++          children: headers.map((header, i) => /* @__PURE__ */ jsx_dev_runtime.jsx("th", {
+             style: { textAlign: getAlignment(i) },
+             children: header
+           }, i, false, undefined, this))
+         }, undefined, false, undefined, this)
+       }, undefined, false, undefined, this),
+-      /* @__PURE__ */ jsx_dev_runtime.jsxDEV("tbody", {
+-        children: rows.map((row, rowIndex) => /* @__PURE__ */ jsx_dev_runtime.jsxDEV("tr", {
+-          children: row.map((cell, cellIndex) => /* @__PURE__ */ jsx_dev_runtime.jsxDEV("td", {
++      /* @__PURE__ */ jsx_dev_runtime.jsx("tbody", {
++        children: rows.map((row, rowIndex) => /* @__PURE__ */ jsx_dev_runtime.jsx("tr", {
++          children: row.map((cell, cellIndex) => /* @__PURE__ */ jsx_dev_runtime.jsx("td", {
+             style: { textAlign: getAlignment(cellIndex) },
+             children: cell
+           }, cellIndex, false, undefined, this))
+@@ -300,23 +301,23 @@ function TableRenderer({ block }) {
+   }, undefined, true, undefined, this);
+ }
+ function ImageRenderer({ block }) {
+-  return /* @__PURE__ */ jsx_dev_runtime.jsxDEV("figure", {
++  return /* @__PURE__ */ jsx_dev_runtime.jsx("figure", {
+     children: [
+-      /* @__PURE__ */ jsx_dev_runtime.jsxDEV("img", {
++      /* @__PURE__ */ jsx_dev_runtime.jsx("img", {
+         src: block.props.url,
+         alt: block.props.alt ?? "",
+         title: block.props.title,
+         width: block.props.width,
+         height: block.props.height
+       }, undefined, false, undefined, this),
+-      block.props.alt && /* @__PURE__ */ jsx_dev_runtime.jsxDEV("figcaption", {
++      block.props.alt && /* @__PURE__ */ jsx_dev_runtime.jsx("figcaption", {
+         children: block.props.alt
+       }, undefined, false, undefined, this)
+     ]
+   }, undefined, true, undefined, this);
+ }
+ function DividerRenderer() {
+-  return /* @__PURE__ */ jsx_dev_runtime.jsxDEV("hr", {}, undefined, false, undefined, this);
++  return /* @__PURE__ */ jsx_dev_runtime.jsx("hr", {}, undefined, false, undefined, this);
+ }
+ function CalloutRenderer({ block }) {
+   const calloutType = block.props.type;
+@@ -334,7 +335,7 @@ function CalloutRenderer({ block }) {
+     note: { borderColor: "#6b7280", backgroundColor: "#f9fafb" }
+   };
+   const colorStyle = colors[calloutType] ?? colors.note;
+-  return /* @__PURE__ */ jsx_dev_runtime.jsxDEV("div", {
++  return /* @__PURE__ */ jsx_dev_runtime.jsx("div", {
+     style: {
+       ...styles,
+       borderLeftColor: colorStyle.borderColor,
+@@ -342,11 +343,11 @@ function CalloutRenderer({ block }) {
+     },
+     role: "alert",
+     children: [
+-      /* @__PURE__ */ jsx_dev_runtime.jsxDEV("strong", {
++      /* @__PURE__ */ jsx_dev_runtime.jsx("strong", {
+         style: { textTransform: "capitalize", display: "block", marginBottom: "0.5rem" },
+         children: calloutType
+       }, undefined, false, undefined, this),
+-      /* @__PURE__ */ jsx_dev_runtime.jsxDEV(InlineContent, {
++      /* @__PURE__ */ jsx_dev_runtime.jsx(InlineContent, {
+         spans: block.content
+       }, undefined, false, undefined, this)
+     ]
+diff --git a/dist/index.js b/dist/index.js
+index 4355a9bd301c247c3165eb1d0bce3a5b4bf75be3..1f0f2ae3847b4651d8dc7f2609fef0e4c59bb8b1 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1,5 +1,6 @@
+ // src/block-renderer.tsx
+-import { jsxDEV, Fragment } from "react/jsx-dev-runtime";
++import { jsx as _jsx, jsxs as _jsxs, Fragment } from "react/jsx-runtime";
++var jsxDEV = (type, props, key, isStaticChildren) => isStaticChildren ? _jsxs(type, props, key) : _jsx(type, props, key);
+ function BlockRenderer({
+   blocks,
+   className,

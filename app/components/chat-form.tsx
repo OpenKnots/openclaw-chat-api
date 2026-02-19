@@ -1,17 +1,16 @@
 "use client";
 
-import { useState, useRef } from "react";
-import ReactMarkdown from "react-markdown";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { BlockRenderer, useMarkdown } from "@create-markdown/react";
 
 const MAX_MESSAGE_LENGTH = 2000;
 
 const AVAILABLE_MODELS = [
-  { id: "gpt-5-nano", name: "GPT-5 nano", description: "Cheapest, Fast, Hybrid" },
-  { id: "gpt-4.1-nano", name: "GPT-4.1 nano", description: "Retrieval, Optimized, Hybrid" },
-  { id: "gpt-4.1-mini", name: "GPT-4.1 mini", description: "Fast, Capable, Hybrid" },
-  { id: "gpt-4o-mini", name: "GPT-4o mini", description: "Quality, Latency, Value" },
-  { id: "gpt-5-mini", name: "GPT-5 mini", description: "Headroom, Better, Hybrid" },
-  { id: "gpt-5.2", name: "GPT-5.2", description: "Complex, Questions, Hybrid" },
+  { id: "gpt-5-nano", name: "GPT-5 nano", description: "Cheapest, Fastest, Efficient" },
+  { id: "gpt-5-mini", name: "GPT-5 mini", description: "Fast, Cost-efficient, Versatile" },
+  { id: "gpt-5", name: "GPT-5", description: "Reasoning, Coding, Agentic" },
+  { id: "gpt-5.1", name: "GPT-5.1", description: "Advanced, Reasoning, Agentic" },
+  { id: "gpt-5.2", name: "GPT-5.2", description: "Flagship, Coding, Agentic" },
 ] as const;
 
 const RETRIEVAL_STRATEGIES = [
@@ -26,12 +25,34 @@ type RetrievalStrategy = (typeof RETRIEVAL_STRATEGIES)[number]["id"];
 
 export default function ChatForm() {
   const [message, setMessage] = useState("");
-  const [response, setResponse] = useState("");
+  const { blocks, setMarkdown } = useMarkdown("");
   const [isLoading, setIsLoading] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<ModelId>("gpt-4.1-mini");
+  const [selectedModel, setSelectedModel] = useState<ModelId>("gpt-5.2");
   const [selectedStrategy, setSelectedStrategy] = useState<RetrievalStrategy>("auto");
+  const [rawResponse, setRawResponse] = useState("");
+  const [copied, setCopied] = useState(false);
   const responseRef = useRef<HTMLDivElement>(null);
+
+  const handleCopy = useCallback(async () => {
+    if (!rawResponse || copied) return;
+    try {
+      await navigator.clipboard.writeText(rawResponse);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = rawResponse;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [rawResponse, copied]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +61,9 @@ export default function ChatForm() {
 
     setIsLoading(true);
     setIsVisible(true);
-    setResponse("");
+    setMarkdown("");
+    setRawResponse("");
+    setCopied(false);
 
     try {
       const res = await fetch("/api/chat", {
@@ -55,14 +78,14 @@ export default function ChatForm() {
 
       if (!res.ok) {
         const err = await res.json();
-        setResponse(`Error: ${err.error || "Unknown error"}`);
+        setMarkdown(`Error: ${err.error || "Unknown error"}`);
         setIsLoading(false);
         return;
       }
 
       const reader = res.body?.getReader();
       if (!reader) {
-        setResponse("Error: No response body");
+        setMarkdown("Error: No response body");
         setIsLoading(false);
         return;
       }
@@ -74,17 +97,62 @@ export default function ChatForm() {
         const { done, value } = await reader.read();
         if (done) break;
         rawText += decoder.decode(value, { stream: true });
-        setResponse(rawText);
+        setMarkdown(rawText);
+        setRawResponse(rawText);
         if (responseRef.current) {
           responseRef.current.scrollTop = responseRef.current.scrollHeight;
         }
       }
     } catch (err) {
-      setResponse(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);
+      setMarkdown(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);
     } finally {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    const container = responseRef.current;
+    if (!container || isLoading) return;
+
+    const COPY_ICON = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+    const CHECK_ICON = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+
+    container.querySelectorAll<HTMLPreElement>("pre").forEach((pre) => {
+      if (pre.querySelector(".code-copy-btn")) return;
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "code-copy-btn";
+      btn.title = "Copy code";
+      btn.setAttribute("aria-label", "Copy code");
+      btn.innerHTML = COPY_ICON;
+
+      btn.addEventListener("click", async () => {
+        const code = pre.querySelector("code");
+        const text = (code ?? pre).textContent ?? "";
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          document.body.removeChild(ta);
+        }
+        btn.innerHTML = CHECK_ICON;
+        btn.classList.add("copied");
+        setTimeout(() => {
+          btn.innerHTML = COPY_ICON;
+          btn.classList.remove("copied");
+        }, 2000);
+      });
+
+      pre.appendChild(btn);
+    });
+  }, [blocks, isLoading]);
 
   const currentModel = AVAILABLE_MODELS.find((m) => m.id === selectedModel);
 
@@ -140,15 +208,35 @@ export default function ChatForm() {
           onChange={(e) => setMessage(e.target.value)}
         />
         <button type="submit" className="chat-btn" disabled={isLoading}>
-          {isLoading ? `${currentModel?.name}...` : "Ask Molty 🦞"}
+          {isLoading ? `${currentModel?.name}...` : <>Ask Molty <img src="/logo.svg" alt="" width={20} height={20} className="btn-logo" /></>}
         </button>
       </form>
       <div
         ref={responseRef}
         className={`response-area ${isVisible ? "visible" : ""} ${isLoading ? "loading" : ""}`}
       >
+        {isVisible && rawResponse && !isLoading && (
+          <button
+            type="button"
+            className={`copy-btn ${copied ? "copied" : ""}`}
+            onClick={handleCopy}
+            aria-label={copied ? "Copied" : "Copy response"}
+            title={copied ? "Copied!" : "Copy"}
+          >
+            {copied ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            )}
+          </button>
+        )}
         <div className="markdown-body">
-          <ReactMarkdown>{response}</ReactMarkdown>
+          <BlockRenderer blocks={blocks} />
         </div>
       </div>
     </>

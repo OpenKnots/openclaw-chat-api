@@ -304,7 +304,10 @@ h1 {
 }
 
 .chat-btn {
-  padding: 0.5rem 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.875rem 1rem;
   border: none;
   border-radius: var(--radius-sm);
   background-color: rgba(255, 78, 64, 0.1);
@@ -313,6 +316,14 @@ h1 {
   font-weight: 700;
   text-transform: uppercase;
   cursor: pointer;
+  transition: background-color 0.2s, transform 0.15s;
+  white-space: nowrap;
+}
+
+.btn-logo {
+  display: inline-block;
+  vertical-align: middle;
+  image-rendering: pixelated;
 }
 
 .chat-btn:hover {
@@ -327,6 +338,7 @@ h1 {
 }
 
 .response-area {
+  position: relative;
   margin-top: 1.2rem;
   padding: 1.25rem 1.5rem;
   background: rgba(0, 0, 0, 0.3);
@@ -340,6 +352,52 @@ h1 {
 
 .response-area.visible {
   display: block;
+}
+
+.copy-btn {
+  position: sticky;
+  top: 0;
+  float: right;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.375rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  cursor: pointer;
+  z-index: 2;
+  margin-left: 0.75rem;
+  margin-bottom: 0.25rem;
+  opacity: 0;
+  transform: scale(0.92);
+  transition: opacity 0.2s ease, transform 0.15s ease, color 0.2s ease,
+    background 0.15s ease, border-color 0.2s ease;
+}
+
+.response-area:hover .copy-btn {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.copy-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.copy-btn:active {
+  transform: scale(0.9);
+}
+
+.copy-btn.copied {
+  opacity: 1;
+  transform: scale(1);
+  color: var(--success);
+  border-color: rgba(74, 222, 128, 0.2);
+  background: rgba(74, 222, 128, 0.06);
 }
 
 .response-area.loading::after {
@@ -396,6 +454,7 @@ h1 {
 }
 
 .markdown-body pre {
+  position: relative;
   margin: 1rem 0;
   padding: 1rem;
   background: rgba(0, 0, 0, 0.4);
@@ -408,6 +467,48 @@ h1 {
   padding: 0;
   background: none;
   font-size: 0.85rem;
+}
+
+.code-copy-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.92);
+  transition: opacity 0.2s ease, transform 0.15s ease, color 0.2s ease,
+    background 0.15s ease, border-color 0.2s ease;
+}
+
+.markdown-body pre:hover .code-copy-btn {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.code-copy-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.code-copy-btn:active {
+  transform: scale(0.88);
+}
+
+.code-copy-btn.copied {
+  opacity: 1;
+  transform: scale(1);
+  color: var(--success);
+  border-color: rgba(74, 222, 128, 0.2);
+  background: rgba(74, 222, 128, 0.06);
 }
 
 .endpoints-section {
