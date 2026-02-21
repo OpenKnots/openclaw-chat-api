@@ -34,6 +34,7 @@ type BenchmarkResult = {
   strategy: string;
   latencyMs: number;
   isDocsResponse: boolean;
+  responseText: string;
 };
 
 export default function ChatForm() {
@@ -56,6 +57,7 @@ export default function ChatForm() {
   const [benchmarkResults, setBenchmarkResults] = useState<BenchmarkResult[]>([]);
   const [isBenchmarking, setIsBenchmarking] = useState(false);
   const [benchmarkProgress, setBenchmarkProgress] = useState(0);
+  const [benchExpanded, setBenchExpanded] = useState<Set<number>>(new Set());
   const responseRef = useRef<HTMLDivElement>(null);
 
   const handleCopy = useCallback(async () => {
@@ -85,6 +87,7 @@ export default function ChatForm() {
     setIsBenchmarking(true);
     setBenchmarkProgress(0);
     setBenchmarkResults([]);
+    setBenchExpanded(new Set());
 
     const results: BenchmarkResult[] = [];
 
@@ -109,19 +112,24 @@ export default function ChatForm() {
         const retrievalMs = parseInt(res.headers.get("X-Retrieval-Ms") || "0", 10);
         const rerankMs = parseInt(res.headers.get("X-Rerank-Ms") || "0", 10);
 
+        let responseText = "";
+        const reader = res.body?.getReader();
+        if (reader) {
+          const decoder = new TextDecoder();
+          let chunk;
+          while (!(chunk = await reader.read()).done) {
+            responseText += decoder.decode(chunk.value, { stream: true });
+          }
+        }
+
         results.push({
           threshold,
           relevanceRank: parseInt(res.headers.get("X-Relevance-Rank") || "0", 10),
           strategy: res.headers.get("X-Strategy") || "—",
           latencyMs: retrievalMs + rerankMs,
           isDocsResponse: res.headers.get("X-Low-Confidence") !== "true",
+          responseText,
         });
-
-        // Drain the stream so the request completes
-        const reader = res.body?.getReader();
-        if (reader) {
-          while (!(await reader.read()).done) { /* drain */ }
-        }
       } catch {
         // Skip failed requests
       }
@@ -282,27 +290,29 @@ export default function ChatForm() {
             ))}
           </select>
         </div>
-        <div className="model-selector threshold-control">
-          <label htmlFor="threshold-slider" className="model-label">
-            Confidence <span className="threshold-value">{confidenceThreshold.toFixed(2)}</span>
-          </label>
-          <input
-            id="threshold-slider"
-            type="range"
-            min="0"
-            max="1"
-            step="0.05"
-            value={confidenceThreshold}
-            onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value))}
-            disabled={isLoading}
-            className="threshold-slider"
-            aria-label="Confidence threshold for general response fallback"
-          />
-          <div className="threshold-labels">
-            <span>Always docs</span>
-            <span>Always general</span>
+        {!isBenchmarking && benchmarkResults.length === 0 && (
+          <div className="model-selector threshold-control">
+            <label htmlFor="threshold-slider" className="model-label">
+              Confidence <span className="threshold-value">{confidenceThreshold.toFixed(2)}</span>
+            </label>
+            <input
+              id="threshold-slider"
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={confidenceThreshold}
+              onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value))}
+              disabled={isLoading}
+              className="threshold-slider"
+              aria-label="Confidence threshold for general response fallback"
+            />
+            <div className="threshold-labels">
+              <span>Always docs</span>
+              <span>Always general</span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
       <form className="chat-form" onSubmit={handleSubmit}>
         <input
@@ -457,66 +467,80 @@ export default function ChatForm() {
           </div>
         );
       })()}
-      {(isBenchmarking || benchmarkResults.length > 0) && (
-        <div className="benchmark-panel">
-          <div className="diagnostics-header">
-            <span className="diagnostics-title">
-              Benchmark {isBenchmarking && <span className="bench-progress">({benchmarkProgress}/{BENCHMARK_THRESHOLDS.length})</span>}
-            </span>
-            {benchmarkResults.length > 0 && !isBenchmarking && (
-              <button
-                type="button"
-                className="bench-clear"
-                onClick={() => setBenchmarkResults([])}
-              >
-                Clear
-              </button>
-            )}
-          </div>
-          {isBenchmarking && (
-            <div className="bench-progress-bar">
-              <div
-                className="bench-progress-fill"
-                style={{ width: `${(benchmarkProgress / BENCHMARK_THRESHOLDS.length) * 100}%` }}
-              />
+      {(isBenchmarking || benchmarkResults.length > 0) && (() => {
+        const allExpanded = benchmarkResults.length > 0 && benchExpanded.size === benchmarkResults.length;
+
+        const toggleRow = (idx: number) => {
+          setBenchExpanded((prev) => {
+            const next = new Set(prev);
+            if (next.has(idx)) next.delete(idx);
+            else next.add(idx);
+            return next;
+          });
+        };
+
+        const toggleAll = () => {
+          if (allExpanded) {
+            setBenchExpanded(new Set());
+          } else {
+            setBenchExpanded(new Set(benchmarkResults.map((_, i) => i)));
+          }
+        };
+
+        return (
+          <div className="benchmark-panel">
+            <div className="diagnostics-header">
+              <span className="diagnostics-title">
+                Benchmark {isBenchmarking && <span className="bench-progress">({benchmarkProgress}/{BENCHMARK_THRESHOLDS.length})</span>}
+              </span>
+              {benchmarkResults.length > 0 && !isBenchmarking && (
+                <div className="bench-actions">
+                  <button type="button" className="bench-clear" onClick={toggleAll}>
+                    {allExpanded ? "Collapse All" : "Expand All"}
+                  </button>
+                  <button type="button" className="bench-clear" onClick={() => { setBenchmarkResults([]); setBenchExpanded(new Set()); }}>
+                    Clear
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-          {benchmarkResults.length > 0 && !isBenchmarking && (
-            <table className="history-table">
-              <thead>
-                <tr>
-                  <th>Rank</th>
-                  <th>Threshold</th>
-                  <th>Relevance</th>
-                  <th>Strategy</th>
-                  <th>Latency</th>
-                  <th>Type</th>
-                </tr>
-              </thead>
-              <tbody>
+            {isBenchmarking && (
+              <div className="bench-progress-bar">
+                <div
+                  className="bench-progress-fill"
+                  style={{ width: `${(benchmarkProgress / BENCHMARK_THRESHOLDS.length) * 100}%` }}
+                />
+              </div>
+            )}
+            {benchmarkResults.length > 0 && !isBenchmarking && (
+              <div className="bench-results">
                 {benchmarkResults.map((r, i) => (
-                  <tr key={r.threshold} className={i === 0 ? "bench-best" : ""}>
-                    <td>{i + 1}</td>
-                    <td>{r.threshold.toFixed(2)}</td>
-                    <td>
+                  <div key={r.threshold} className={`bench-row ${i === 0 ? "bench-best" : ""}`}>
+                    <button type="button" className="bench-row-header" onClick={() => toggleRow(i)}>
+                      <span className="bench-row-rank">#{i + 1}</span>
+                      <span className="bench-row-threshold">{r.threshold.toFixed(2)}</span>
                       <span className="diag-rank" data-rank={r.relevanceRank}>
                         {"★".repeat(r.relevanceRank)}{"☆".repeat(5 - r.relevanceRank)}
                       </span>
-                    </td>
-                    <td>{r.strategy}</td>
-                    <td>{r.latencyMs}ms</td>
-                    <td>
+                      <span className="bench-row-meta">{r.strategy}</span>
+                      <span className="bench-row-meta">{r.latencyMs}ms</span>
                       <span className={`diagnostics-badge ${r.isDocsResponse ? "badge-docs" : "badge-general"}`}>
                         {r.isDocsResponse ? "Docs" : "General"}
                       </span>
-                    </td>
-                  </tr>
+                      <span className={`history-chevron ${benchExpanded.has(i) ? "open" : ""}`}>{"\u25B6"}</span>
+                    </button>
+                    {benchExpanded.has(i) && (
+                      <div className="bench-row-response markdown-body">
+                        <pre>{r.responseText || "(empty response)"}</pre>
+                      </div>
+                    )}
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </>
   );
 }

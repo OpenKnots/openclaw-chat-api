@@ -618,9 +618,92 @@ h1 {
   transition: width 0.3s ease-out;
 }
 
-.bench-best td {
+.bench-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.bench-results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+
+.bench-row {
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bench-row.bench-best {
+  border-color: rgba(34, 197, 94, 0.2);
+}
+
+.bench-row-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-family: var(--font-mono, monospace);
+  cursor: pointer;
+  transition: background 0.15s;
+  text-align: left;
+}
+
+.bench-row-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.bench-best .bench-row-header {
   color: var(--text-primary);
   font-weight: 600;
+}
+
+.bench-row-rank {
+  min-width: 1.5rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.bench-row-threshold {
+  min-width: 2.5rem;
+}
+
+.bench-row-meta {
+  color: var(--text-muted);
+}
+
+.bench-row-header .history-chevron {
+  margin-left: auto;
+}
+
+.bench-row-response {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(0, 0, 0, 0.2);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.bench-row-response pre {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--text-secondary);
 }
 
 .chat-form {
