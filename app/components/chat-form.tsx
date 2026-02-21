@@ -27,7 +27,7 @@ type DiagSnapshot = {
   isDocsResponse: boolean;
 };
 
-const BENCHMARK_THRESHOLDS = [0.0, 0.33, 0.66, 1.0] as const;
+const BENCHMARK_THRESHOLDS = [0.0, 0.2, 0.4, 0.8] as const;
 const MAX_BENCH_RUNS = 50;
 
 type BenchmarkResult = {
