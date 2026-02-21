@@ -211,7 +211,7 @@ h1 {
 
 .selectors-row {
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
+  grid-template-columns: 1fr 1fr;
   gap: 1rem;
   margin-bottom: 1rem;
   align-items: center;
@@ -276,65 +276,10 @@ h1 {
   padding: 0.5rem;
 }
 
-.strict-toggle {
-  justify-self: end;
-}
-
-.toggle-switch {
-  position: relative;
-  display: inline-block;
-  width: 2.5rem;
-  height: 1.25rem;
-  flex-shrink: 0;
-}
-
-.toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.toggle-slider {
-  position: absolute;
-  cursor: pointer;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid var(--glass-border);
-  border-radius: 1.25rem;
-  transition: 0.2s;
-}
-
-.toggle-slider::before {
-  content: "";
-  position: absolute;
-  height: 1rem;
-  width: 1rem;
-  left: 2px;
-  bottom: 2px;
-  background: var(--text-muted);
-  border-radius: 50%;
-  transition: 0.2s;
-}
-
-.toggle-switch input:checked + .toggle-slider {
-  background: rgba(59, 130, 246, 0.3);
-  border-color: rgba(59, 130, 246, 0.5);
-}
-
-.toggle-switch input:checked + .toggle-slider::before {
-  transform: translateX(1.25rem);
-  background: var(--accent);
-}
-
-.toggle-switch input:disabled + .toggle-slider {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 /* ── Confidence Threshold Slider ── */
 
 .threshold-control {
-  flex: 1 1 100%;
+  grid-column: 1 / -1;
   margin-top: 0.25rem;
 }
 
@@ -485,18 +430,101 @@ h1 {
   font-weight: 600;
 }
 
-.diag-verdict {
-  grid-column: span 2;
-}
-
 @media (max-width: 640px) {
   .diagnostics-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+}
 
-  .diag-verdict {
-    grid-column: span 2;
-  }
+/* ── Inline Delta Indicators ── */
+
+.diag-delta {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 600;
+  margin-left: 0.35rem;
+  vertical-align: middle;
+}
+
+.delta-up {
+  color: rgb(34, 197, 94);
+}
+
+.delta-down {
+  color: rgb(239, 68, 68);
+}
+
+/* ── History Toggle & Table ── */
+
+.history-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  padding: 0.3rem 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  font-family: var(--font-mono, monospace);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.history-toggle:hover {
+  color: var(--text-secondary);
+}
+
+.history-chevron {
+  display: inline-block;
+  font-size: 0.5rem;
+  transition: transform 0.2s;
+}
+
+.history-chevron.open {
+  transform: rotate(90deg);
+}
+
+.history-table {
+  width: 100%;
+  margin-top: 0.4rem;
+  border-collapse: collapse;
+  font-size: 0.7rem;
+}
+
+.history-table th {
+  text-align: left;
+  font-size: 0.55rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.history-table td {
+  padding: 0.3rem 0.5rem;
+  color: var(--text-secondary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.history-table tr:last-child td {
+  border-bottom: none;
+}
+
+.history-query {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-table .diagnostics-badge {
+  font-size: 0.55rem;
+  padding: 0.1rem 0.35rem;
 }
 
 .chat-form {

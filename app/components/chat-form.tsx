@@ -23,6 +23,17 @@ const RETRIEVAL_STRATEGIES = [
 type ModelId = (typeof AVAILABLE_MODELS)[number]["id"];
 type RetrievalStrategy = (typeof RETRIEVAL_STRATEGIES)[number]["id"];
 
+const MAX_HISTORY = 5;
+
+type DiagSnapshot = {
+  query: string;
+  bestScore: number;
+  resultCount: number;
+  strategy: string;
+  latencyMs: number;
+  isDocsResponse: boolean;
+};
+
 export default function ChatForm() {
   const [message, setMessage] = useState("");
   const { blocks, setMarkdown } = useMarkdown("");
@@ -30,20 +41,18 @@ export default function ChatForm() {
   const [isVisible, setIsVisible] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ModelId>("gpt-5.2");
   const [selectedStrategy, setSelectedStrategy] = useState<RetrievalStrategy>("auto");
-  const [strictMode, setStrictMode] = useState(false);
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.3);
   const [diagnostics, setDiagnostics] = useState<{
     bestScore: string;
-    threshold: string;
     lowConfidence: string;
     resultCount: string;
     strategy: string;
-    intent: string;
-    retrievalMs: string;
-    rerankMs: string;
+    latencyMs: string;
   } | null>(null);
   const [rawResponse, setRawResponse] = useState("");
   const [copied, setCopied] = useState(false);
+  const [history, setHistory] = useState<DiagSnapshot[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const responseRef = useRef<HTMLDivElement>(null);
 
   const handleCopy = useCallback(async () => {
@@ -86,7 +95,6 @@ export default function ChatForm() {
           message: trimmedMessage,
           model: selectedModel,
           retrieval: selectedStrategy,
-          strict: strictMode,
           confidenceThreshold,
         }),
       });
@@ -98,15 +106,34 @@ export default function ChatForm() {
         return;
       }
 
+      const retrievalMs = parseInt(res.headers.get("X-Retrieval-Ms") || "0", 10);
+      const rerankMs = parseInt(res.headers.get("X-Rerank-Ms") || "0", 10);
+
+      const bestScoreStr = res.headers.get("X-Best-Score") || "—";
+      const lowConfStr = res.headers.get("X-Low-Confidence") || "—";
+      const resultCountStr = res.headers.get("X-Result-Count") || "—";
+      const strategyStr = res.headers.get("X-Strategy") || "—";
+      const totalLatency = retrievalMs + rerankMs;
+
       setDiagnostics({
-        bestScore: res.headers.get("X-Best-Score") || "—",
-        threshold: res.headers.get("X-Threshold") || "—",
-        lowConfidence: res.headers.get("X-Low-Confidence") || "—",
-        resultCount: res.headers.get("X-Result-Count") || "—",
-        strategy: res.headers.get("X-Strategy") || "—",
-        intent: res.headers.get("X-Intent") || "—",
-        retrievalMs: res.headers.get("X-Retrieval-Ms") || "—",
-        rerankMs: res.headers.get("X-Rerank-Ms") || "—",
+        bestScore: bestScoreStr,
+        lowConfidence: lowConfStr,
+        resultCount: resultCountStr,
+        strategy: strategyStr,
+        latencyMs: totalLatency.toString(),
+      });
+
+      setHistory((prev) => {
+        const snapshot: DiagSnapshot = {
+          query: trimmedMessage.length > 40 ? trimmedMessage.slice(0, 37) + "..." : trimmedMessage,
+          bestScore: parseFloat(bestScoreStr) || 0,
+          resultCount: parseInt(resultCountStr, 10) || 0,
+          strategy: strategyStr,
+          latencyMs: totalLatency,
+          isDocsResponse: lowConfStr !== "true",
+        };
+        const next = [...prev, snapshot];
+        return next.length > MAX_HISTORY ? next.slice(next.length - MAX_HISTORY) : next;
       });
 
       const reader = res.body?.getReader();
@@ -221,22 +248,6 @@ export default function ChatForm() {
             ))}
           </select>
         </div>
-        <div className="model-selector strict-toggle">
-          <label htmlFor="strict-toggle" className="model-label">
-            Strict
-          </label>
-          <label className="toggle-switch">
-            <input
-              id="strict-toggle"
-              type="checkbox"
-              checked={strictMode}
-              onChange={(e) => setStrictMode(e.target.checked)}
-              disabled={isLoading}
-              aria-label="Strict mode: docs only, no general knowledge"
-            />
-            <span className="toggle-slider" />
-          </label>
-        </div>
         <div className="model-selector threshold-control">
           <label htmlFor="threshold-slider" className="model-label">
             Confidence <span className="threshold-value">{confidenceThreshold.toFixed(2)}</span>
@@ -249,7 +260,7 @@ export default function ChatForm() {
             step="0.05"
             value={confidenceThreshold}
             onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value))}
-            disabled={isLoading || strictMode}
+            disabled={isLoading}
             className="threshold-slider"
             aria-label="Confidence threshold for general response fallback"
           />
@@ -302,54 +313,100 @@ export default function ChatForm() {
           <BlockRenderer blocks={blocks} />
         </div>
       </div>
-      {diagnostics && (
-        <div className="diagnostics-panel">
-          <div className="diagnostics-header">
-            <span className="diagnostics-title">Diagnostics</span>
-            <span className={`diagnostics-badge ${diagnostics.lowConfidence === "true" ? "badge-general" : "badge-docs"}`}>
-              {diagnostics.lowConfidence === "true" ? "General Response" : "Docs Response"}
-            </span>
-          </div>
-          <div className="diagnostics-grid">
-            <div className="diag-item">
-              <span className="diag-label">Best Score</span>
-              <span className="diag-value diag-score">{diagnostics.bestScore}</span>
-            </div>
-            <div className="diag-item">
-              <span className="diag-label">Threshold</span>
-              <span className="diag-value">{diagnostics.threshold}</span>
-            </div>
-            <div className="diag-item">
-              <span className="diag-label">Results</span>
-              <span className="diag-value">{diagnostics.resultCount}</span>
-            </div>
-            <div className="diag-item">
-              <span className="diag-label">Strategy</span>
-              <span className="diag-value">{diagnostics.strategy}</span>
-            </div>
-            <div className="diag-item">
-              <span className="diag-label">Intent</span>
-              <span className="diag-value">{diagnostics.intent}</span>
-            </div>
-            <div className="diag-item">
-              <span className="diag-label">Retrieval</span>
-              <span className="diag-value">{diagnostics.retrievalMs}ms</span>
-            </div>
-            <div className="diag-item">
-              <span className="diag-label">Rerank</span>
-              <span className="diag-value">{diagnostics.rerankMs}ms</span>
-            </div>
-            <div className="diag-item diag-verdict">
-              <span className="diag-label">Verdict</span>
-              <span className="diag-value">
-                {parseFloat(diagnostics.bestScore) >= parseFloat(diagnostics.threshold)
-                  ? `${diagnostics.bestScore} >= ${diagnostics.threshold} → Docs`
-                  : `${diagnostics.bestScore} < ${diagnostics.threshold} → General`}
+      {diagnostics && (() => {
+        const prev = history.length >= 2 ? history[history.length - 2] : null;
+        const curScore = parseFloat(diagnostics.bestScore) || 0;
+        const curLatency = parseInt(diagnostics.latencyMs, 10) || 0;
+        const scoreDelta = prev ? curScore - prev.bestScore : null;
+        const latencyDelta = prev ? curLatency - prev.latencyMs : null;
+
+        return (
+          <div className="diagnostics-panel">
+            <div className="diagnostics-header">
+              <span className="diagnostics-title">Diagnostics</span>
+              <span className={`diagnostics-badge ${diagnostics.lowConfidence === "true" ? "badge-general" : "badge-docs"}`}>
+                {diagnostics.lowConfidence === "true" ? "General Response" : "Docs Response"}
               </span>
             </div>
+            <div className="diagnostics-grid">
+              <div className="diag-item">
+                <span className="diag-label">Best Score</span>
+                <span className="diag-value diag-score">
+                  {diagnostics.bestScore}
+                  {scoreDelta !== null && (
+                    <span className={`diag-delta ${scoreDelta >= 0 ? "delta-up" : "delta-down"}`}>
+                      {scoreDelta >= 0 ? "\u25B2" : "\u25BC"} {scoreDelta >= 0 ? "+" : ""}{scoreDelta.toFixed(2)}
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="diag-item">
+                <span className="diag-label">Results</span>
+                <span className="diag-value">{diagnostics.resultCount}</span>
+              </div>
+              <div className="diag-item">
+                <span className="diag-label">Strategy</span>
+                <span className="diag-value">{diagnostics.strategy}</span>
+              </div>
+              <div className="diag-item">
+                <span className="diag-label">Latency</span>
+                <span className="diag-value">
+                  {diagnostics.latencyMs}ms
+                  {latencyDelta !== null && (
+                    <span className={`diag-delta ${latencyDelta <= 0 ? "delta-up" : "delta-down"}`}>
+                      {latencyDelta <= 0 ? "\u25BC" : "\u25B2"} {latencyDelta >= 0 ? "+" : ""}{latencyDelta}ms
+                    </span>
+                  )}
+                </span>
+              </div>
+            </div>
+            {history.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  className="history-toggle"
+                  onClick={() => setHistoryOpen((o) => !o)}
+                >
+                  History ({history.length}/{MAX_HISTORY})
+                  <span className={`history-chevron ${historyOpen ? "open" : ""}`}>{"\u25B6"}</span>
+                </button>
+                {historyOpen && (
+                  <table className="history-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Query</th>
+                        <th>Score</th>
+                        <th>Results</th>
+                        <th>Strategy</th>
+                        <th>Latency</th>
+                        <th>Type</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...history].reverse().map((h, i) => (
+                        <tr key={history.length - i}>
+                          <td>{history.length - i}</td>
+                          <td className="history-query">{h.query}</td>
+                          <td>{h.bestScore.toFixed(4)}</td>
+                          <td>{h.resultCount}</td>
+                          <td>{h.strategy}</td>
+                          <td>{h.latencyMs}ms</td>
+                          <td>
+                            <span className={`diagnostics-badge ${h.isDocsResponse ? "badge-docs" : "badge-general"}`}>
+                              {h.isDocsResponse ? "Docs" : "General"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
     </>
   );
 }

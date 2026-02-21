@@ -66,7 +66,6 @@ function jsonResponse(
   });
 }
 
-// Enhanced system prompt for better answers
 function buildSystemPrompt(context: string): string {
   return `You are an expert assistant for OpenClaw documentation.
 
@@ -179,7 +178,6 @@ export async function POST(request: NextRequest) {
       ? defaultModel
       : "gpt-5-mini";
     let userStrategy: UserStrategy = "auto";
-    let strictMode = false;
     let confidenceThreshold = LOW_CONFIDENCE_THRESHOLD;
 
     try {
@@ -198,9 +196,6 @@ export async function POST(request: NextRequest) {
         ALLOWED_STRATEGIES.includes(body.retrieval as UserStrategy)
       ) {
         userStrategy = body.retrieval as UserStrategy;
-      }
-      if (typeof body?.strict === "boolean") {
-        strictMode = body.strict;
       }
       if (
         typeof body?.confidenceThreshold === "number" &&
@@ -399,43 +394,9 @@ export async function POST(request: NextRequest) {
       topScores = finalResults.map((r) => r.score);
     }
 
-    // Strict mode: docs-only, no fallback to general knowledge
-    if (strictMode && finalResults.length === 0) {
-      logQueryAsync(queryId, {
-        timestamp: startTime,
-        query: trimmedMessage,
-        intent: classified.intent,
-        strategy: classified.strategy,
-        retrievalMs,
-        rerankMs,
-        totalMs: Date.now() - startTime,
-        resultCount: 0,
-        topChunkIds: [],
-        topScores: [],
-        model,
-        success: false,
-        errorMessage: "No results found (strict mode)",
-        clientIp,
-      });
-
-      return new Response(
-        "I couldn't find relevant documentation excerpts for that question. Try rephrasing or search the docs.",
-        {
-          headers: {
-            "Content-Type": "text/plain",
-            ...getCorsHeaders(request),
-            ...rateLimitHeaders,
-            "X-Query-Id": queryId,
-          },
-        }
-      );
-    }
-
-    // Build context and select prompt based on retrieval confidence (unless strict)
     const hasResults = finalResults.length > 0;
     const bestScore = hasResults ? topScores[0] : 0;
-    const isLowConfidence =
-      !strictMode && (!hasResults || bestScore < confidenceThreshold);
+    const isLowConfidence = !hasResults || bestScore < confidenceThreshold;
 
     const context = hasResults
       ? finalResults
