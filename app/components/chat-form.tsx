@@ -27,8 +27,7 @@ const MAX_HISTORY = 5;
 
 type DiagSnapshot = {
   query: string;
-  bestScore: number;
-  resultCount: number;
+  relevanceRank: number;
   strategy: string;
   latencyMs: number;
   isDocsResponse: boolean;
@@ -43,9 +42,8 @@ export default function ChatForm() {
   const [selectedStrategy, setSelectedStrategy] = useState<RetrievalStrategy>("auto");
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.3);
   const [diagnostics, setDiagnostics] = useState<{
-    bestScore: string;
+    relevanceRank: string;
     lowConfidence: string;
-    resultCount: string;
     strategy: string;
     latencyMs: string;
   } | null>(null);
@@ -109,16 +107,14 @@ export default function ChatForm() {
       const retrievalMs = parseInt(res.headers.get("X-Retrieval-Ms") || "0", 10);
       const rerankMs = parseInt(res.headers.get("X-Rerank-Ms") || "0", 10);
 
-      const bestScoreStr = res.headers.get("X-Best-Score") || "—";
+      const relevanceRankStr = res.headers.get("X-Relevance-Rank") || "—";
       const lowConfStr = res.headers.get("X-Low-Confidence") || "—";
-      const resultCountStr = res.headers.get("X-Result-Count") || "—";
       const strategyStr = res.headers.get("X-Strategy") || "—";
       const totalLatency = retrievalMs + rerankMs;
 
       setDiagnostics({
-        bestScore: bestScoreStr,
+        relevanceRank: relevanceRankStr,
         lowConfidence: lowConfStr,
-        resultCount: resultCountStr,
         strategy: strategyStr,
         latencyMs: totalLatency.toString(),
       });
@@ -126,8 +122,7 @@ export default function ChatForm() {
       setHistory((prev) => {
         const snapshot: DiagSnapshot = {
           query: trimmedMessage.length > 40 ? trimmedMessage.slice(0, 37) + "..." : trimmedMessage,
-          bestScore: parseFloat(bestScoreStr) || 0,
-          resultCount: parseInt(resultCountStr, 10) || 0,
+          relevanceRank: parseInt(relevanceRankStr, 10) || 0,
           strategy: strategyStr,
           latencyMs: totalLatency,
           isDocsResponse: lowConfStr !== "true",
@@ -315,10 +310,18 @@ export default function ChatForm() {
       </div>
       {diagnostics && (() => {
         const prev = history.length >= 2 ? history[history.length - 2] : null;
-        const curScore = parseFloat(diagnostics.bestScore) || 0;
+        const curRank = parseInt(diagnostics.relevanceRank, 10) || 0;
         const curLatency = parseInt(diagnostics.latencyMs, 10) || 0;
-        const scoreDelta = prev ? curScore - prev.bestScore : null;
+        const rankDelta = prev ? curRank - prev.relevanceRank : null;
         const latencyDelta = prev ? curLatency - prev.latencyMs : null;
+
+        const rankLabels: Record<number, string> = {
+          5: "Excellent",
+          4: "Good",
+          3: "Partial",
+          2: "Weak",
+          1: "Off-topic",
+        };
 
         return (
           <div className="diagnostics-panel">
@@ -330,19 +333,16 @@ export default function ChatForm() {
             </div>
             <div className="diagnostics-grid">
               <div className="diag-item">
-                <span className="diag-label">Best Score</span>
-                <span className="diag-value diag-score">
-                  {diagnostics.bestScore}
-                  {scoreDelta !== null && (
-                    <span className={`diag-delta ${scoreDelta >= 0 ? "delta-up" : "delta-down"}`}>
-                      {scoreDelta >= 0 ? "\u25B2" : "\u25BC"} {scoreDelta >= 0 ? "+" : ""}{scoreDelta.toFixed(2)}
+                <span className="diag-label">Relevance</span>
+                <span className="diag-value diag-rank" data-rank={curRank}>
+                  {"★".repeat(curRank)}{"☆".repeat(5 - curRank)}
+                  <span className="rank-label">{rankLabels[curRank] || "—"}</span>
+                  {rankDelta !== null && rankDelta !== 0 && (
+                    <span className={`diag-delta ${rankDelta > 0 ? "delta-up" : "delta-down"}`}>
+                      {rankDelta > 0 ? "\u25B2" : "\u25BC"} {rankDelta > 0 ? "+" : ""}{rankDelta}
                     </span>
                   )}
                 </span>
-              </div>
-              <div className="diag-item">
-                <span className="diag-label">Results</span>
-                <span className="diag-value">{diagnostics.resultCount}</span>
               </div>
               <div className="diag-item">
                 <span className="diag-label">Strategy</span>
@@ -376,8 +376,7 @@ export default function ChatForm() {
                       <tr>
                         <th>#</th>
                         <th>Query</th>
-                        <th>Score</th>
-                        <th>Results</th>
+                        <th>Rank</th>
                         <th>Strategy</th>
                         <th>Latency</th>
                         <th>Type</th>
@@ -388,8 +387,7 @@ export default function ChatForm() {
                         <tr key={history.length - i}>
                           <td>{history.length - i}</td>
                           <td className="history-query">{h.query}</td>
-                          <td>{h.bestScore.toFixed(4)}</td>
-                          <td>{h.resultCount}</td>
+                          <td>{"★".repeat(h.relevanceRank)}{"☆".repeat(5 - h.relevanceRank)}</td>
                           <td>{h.strategy}</td>
                           <td>{h.latencyMs}ms</td>
                           <td>

@@ -37,7 +37,7 @@ function getCorsHeaders(request: Request) {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Expose-Headers": "X-Query-Id, X-Best-Score, X-Threshold, X-Low-Confidence, X-Result-Count, X-Strategy, X-Intent, X-Retrieval-Ms, X-Rerank-Ms",
+    "Access-Control-Expose-Headers": "X-Query-Id, X-Best-Score, X-Threshold, X-Low-Confidence, X-Result-Count, X-Strategy, X-Intent, X-Retrieval-Ms, X-Rerank-Ms, X-Relevance-Rank",
     "Vary": "Origin",
   };
 }
@@ -398,6 +398,13 @@ export async function POST(request: NextRequest) {
     const bestScore = hasResults ? topScores[0] : 0;
     const isLowConfidence = !hasResults || bestScore < confidenceThreshold;
 
+    const relevanceRank = computeRelevanceRank(
+      bestScore,
+      finalResults.length,
+      classified.intent,
+      isLowConfidence,
+    );
+
     const context = hasResults
       ? finalResults
           .map((result) => `[${result.title}](${result.url})\n${result.content.slice(0, 1200)}`)
@@ -522,12 +529,52 @@ export async function POST(request: NextRequest) {
         "X-Intent": classified.intent,
         "X-Retrieval-Ms": retrievalMs.toString(),
         "X-Rerank-Ms": rerankMs.toString(),
+        "X-Relevance-Rank": relevanceRank.toString(),
       },
     });
   } catch (error) {
     console.error("[Error]", error);
     return jsonResponse(request, { error: "Internal Server Error", status: 500 }, 500);
   }
+}
+
+/**
+ * Computes a 1–5 relevance rank estimating how valuable the response is
+ * for an OpenClaw builder. Factors in retrieval quality, coverage,
+ * query intent, and whether docs were used vs general fallback.
+ *
+ *   5 = Direct, high-confidence docs answer to a builder-actionable question
+ *   4 = Good docs coverage with solid relevance
+ *   3 = Partial docs match or general answer to a relevant topic
+ *   2 = Weak match, mostly general knowledge
+ *   1 = Off-topic or no useful docs found
+ */
+function computeRelevanceRank(
+  bestScore: number,
+  resultCount: number,
+  intent: string,
+  isLowConfidence: boolean,
+): number {
+  let rank = 0;
+
+  // Score component (0–2 points): raw retrieval quality
+  if (bestScore >= 0.75) rank += 2;
+  else if (bestScore >= 0.45) rank += 1.5;
+  else if (bestScore >= 0.25) rank += 1;
+  else if (bestScore >= 0.1) rank += 0.5;
+
+  // Coverage component (0–1 point): how many chunks matched
+  if (resultCount >= 5) rank += 1;
+  else if (resultCount >= 2) rank += 0.5;
+
+  // Intent component (0–1 point): builder-actionable intents score higher
+  if (intent === "lookup" || intent === "troubleshooting") rank += 1;
+  else if (intent === "conceptual") rank += 0.5;
+
+  // Docs vs general penalty (0–1 point)
+  if (!isLowConfidence) rank += 1;
+
+  return Math.max(1, Math.min(5, Math.round(rank)));
 }
 
 /**
