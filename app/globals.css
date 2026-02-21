@@ -679,38 +679,6 @@ h1 {
   font-weight: 600;
 }
 
-.bench-override-btn {
-  flex-shrink: 0;
-  padding: 0.2rem 0.5rem;
-  margin-right: 0.4rem;
-  font-size: 0.65rem;
-  font-family: var(--font-mono, monospace);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.bench-override-btn:hover:not(:disabled) {
-  background: rgba(99, 102, 241, 0.15);
-  border-color: rgba(99, 102, 241, 0.3);
-  color: rgb(165, 180, 252);
-}
-
-.bench-override-btn.override-active {
-  background: rgba(34, 197, 94, 0.1);
-  border-color: rgba(34, 197, 94, 0.25);
-  color: rgb(34, 197, 94);
-  cursor: default;
-  font-size: 0.8rem;
-  padding: 0.1rem 0.4rem;
-}
-
-.bench-override-btn:disabled {
-  opacity: 1;
-}
 
 .bench-row-rank {
   min-width: 1.5rem;
@@ -724,6 +692,15 @@ h1 {
 
 .bench-row-meta {
   color: var(--text-muted);
+}
+
+.bench-row-score {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
 }
 
 .bench-row-header .history-chevron {
@@ -811,7 +788,7 @@ h1 {
 
 .tally-row {
   display: grid;
-  grid-template-columns: 3rem 1fr 2.5rem;
+  grid-template-columns: 3rem 1fr auto;
   align-items: center;
   gap: 0.75rem;
 }
@@ -852,6 +829,11 @@ h1 {
   font-size: 0.8rem;
   color: var(--text-secondary);
   text-align: right;
+}
+
+.tally-max {
+  color: var(--text-muted);
+  font-size: 0.7rem;
 }
 
 .tally-cap {

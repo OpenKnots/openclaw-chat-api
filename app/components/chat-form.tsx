@@ -8,14 +8,6 @@ const MAX_MESSAGE_LENGTH = 2000;
 const MODEL = "gpt-5.2" as const;
 const BENCH_MODEL = "gpt-5-mini" as const;
 
-const RETRIEVAL_STRATEGIES = [
-  { id: "auto", name: "Auto", description: "Query, Retrieval, Hybrid" },
-  { id: "hybrid", name: "Hybrid", description: "Semantic, Keyword, Hybrid" },
-  { id: "semantic", name: "Semantic", description: "Meaning, Semantic" },
-  { id: "keyword", name: "Keyword", description: "Exact Match, Keywords, Keyword" },
-] as const;
-
-type RetrievalStrategy = (typeof RETRIEVAL_STRATEGIES)[number]["id"];
 
 const MAX_HISTORY = 5;
 
@@ -50,7 +42,6 @@ export default function ChatForm() {
   const { blocks, setMarkdown } = useMarkdown("");
   const [isLoading, setIsLoading] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  const [selectedStrategy, setSelectedStrategy] = useState<RetrievalStrategy>("auto");
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.3);
   const [diagnostics, setDiagnostics] = useState<{
     relevanceRank: string;
@@ -66,9 +57,8 @@ export default function ChatForm() {
   const [isBenchmarking, setIsBenchmarking] = useState(false);
   const [benchmarkProgress, setBenchmarkProgress] = useState(0);
   const [benchExpanded, setBenchExpanded] = useState<Set<number>>(new Set());
-  const [winTally, setWinTally] = useState<Record<number, number>>({});
+  const [scoreTally, setScoreTally] = useState<Record<number, number>>({});
   const [benchRunCount, setBenchRunCount] = useState(0);
-  const [benchWinner, setBenchWinner] = useState<number | null>(null);
   const [benchRegenerating, setBenchRegenerating] = useState<number | null>(null);
   const [responseCollapsed, setResponseCollapsed] = useState(false);
   const responseRef = useRef<HTMLDivElement>(null);
@@ -93,6 +83,13 @@ export default function ChatForm() {
     }
   }, [rawResponse, copied]);
 
+  const scoreBenchResult = useCallback((r: BenchmarkResult): number => {
+    const relevance = (r.relevanceRank / 5) * 25;
+    const docs = r.isDocsResponse ? 15 : 0;
+    const speed = Math.max(0, 10 - r.latencyMs / 100);
+    return Math.round(Math.min(50, relevance + docs + speed));
+  }, []);
+
   const handleBenchmark = useCallback(async () => {
     const trimmedMessage = message.trim();
     if (!trimmedMessage || isBenchmarking || isLoading) return;
@@ -101,7 +98,6 @@ export default function ChatForm() {
     setBenchmarkProgress(0);
     setBenchmarkResults([]);
     setBenchExpanded(new Set());
-    setBenchWinner(null);
 
     let completed = 0;
 
@@ -113,7 +109,7 @@ export default function ChatForm() {
           body: JSON.stringify({
             message: trimmedMessage,
             model: BENCH_MODEL,
-            retrieval: selectedStrategy,
+            retrieval: "auto",
             confidenceThreshold: threshold,
           }),
         });
@@ -159,14 +155,18 @@ export default function ChatForm() {
     setBenchmarkResults(results);
 
     if (results.length > 0) {
-      setBenchWinner(0);
-      const winner = results[0].threshold;
-      setWinTally((prev) => ({ ...prev, [winner]: (prev[winner] || 0) + 1 }));
+      setScoreTally((prev) => {
+        const next = { ...prev };
+        for (const r of results) {
+          next[r.threshold] = (next[r.threshold] || 0) + scoreBenchResult(r);
+        }
+        return next;
+      });
       setBenchRunCount((prev) => prev + 1);
     }
 
     setIsBenchmarking(false);
-  }, [message, isBenchmarking, isLoading, selectedStrategy]);
+  }, [message, isBenchmarking, isLoading, scoreBenchResult]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,7 +188,7 @@ export default function ChatForm() {
         body: JSON.stringify({
           message: trimmedMessage,
           model: MODEL,
-          retrieval: selectedStrategy,
+          retrieval: "auto",
           confidenceThreshold,
         }),
       });
@@ -306,26 +306,8 @@ export default function ChatForm() {
 
   return (
     <>
-      <div className="selectors-row">
-        <div className="model-selector">
-          <label htmlFor="strategy-select" className="model-label">
-            Search
-          </label>
-          <select
-            id="strategy-select"
-            className="model-select"
-            value={selectedStrategy}
-            onChange={(e) => setSelectedStrategy(e.target.value as RetrievalStrategy)}
-            disabled={isLoading}
-          >
-            {RETRIEVAL_STRATEGIES.map((strategy) => (
-              <option key={strategy.id} value={strategy.id}>
-                {strategy.name} ({strategy.description})
-              </option>
-            ))}
-          </select>
-        </div>
-        {!isBenchmarking && benchmarkResults.length === 0 && (
+      {!isBenchmarking && benchmarkResults.length === 0 && (
+        <div className="selectors-row">
           <div className="model-selector threshold-control">
             <label htmlFor="threshold-slider" className="model-label">
               Confidence <span className="threshold-value">{confidenceThreshold.toFixed(2)}</span>
@@ -347,8 +329,8 @@ export default function ChatForm() {
               <span>Always general</span>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
       <form className="chat-form" onSubmit={handleSubmit}>
         <input
           type="text"
@@ -538,18 +520,6 @@ export default function ChatForm() {
           }
         };
 
-        const overrideWinner = (idx: number) => {
-          if (benchWinner === null || benchWinner === idx) return;
-          const prevThreshold = benchmarkResults[benchWinner].threshold;
-          const newThreshold = benchmarkResults[idx].threshold;
-          setWinTally((prev) => ({
-            ...prev,
-            [prevThreshold]: Math.max(0, (prev[prevThreshold] || 0) - 1),
-            [newThreshold]: (prev[newThreshold] || 0) + 1,
-          }));
-          setBenchWinner(idx);
-        };
-
         const regenerateWith52 = async (idx: number) => {
           const r = benchmarkResults[idx];
           if (!r || benchRegenerating !== null) return;
@@ -561,7 +531,7 @@ export default function ChatForm() {
               body: JSON.stringify({
                 message: message.trim(),
                 model: MODEL,
-                retrieval: selectedStrategy,
+                retrieval: "auto",
                 confidenceThreshold: r.threshold,
               }),
             });
@@ -605,7 +575,7 @@ export default function ChatForm() {
                   <button type="button" className="bench-clear" onClick={toggleAll}>
                     {allExpanded ? "Collapse All" : "Expand All"}
                   </button>
-                  <button type="button" className="bench-clear" onClick={() => { setBenchmarkResults([]); setBenchExpanded(new Set()); setBenchWinner(null); }}>
+                  <button type="button" className="bench-clear" onClick={() => { setBenchmarkResults([]); setBenchExpanded(new Set()); }}>
                     Clear
                   </button>
                 </div>
@@ -622,7 +592,7 @@ export default function ChatForm() {
             {benchmarkResults.length > 0 && !isBenchmarking && (
               <div className="bench-results">
                 {benchmarkResults.map((r, i) => (
-                  <div key={r.threshold} className={`bench-row ${benchWinner === i ? "bench-best" : ""}`}>
+                  <div key={r.threshold} className="bench-row">
                     <div className="bench-row-header-wrap">
                       <button type="button" className="bench-row-header" onClick={() => toggleRow(i)}>
                         <span className="bench-row-rank">#{i + 1}</span>
@@ -635,16 +605,8 @@ export default function ChatForm() {
                         <span className={`diagnostics-badge ${r.isDocsResponse ? "badge-docs" : "badge-general"}`}>
                           {r.isDocsResponse ? "Docs" : "General"}
                         </span>
+                        <span className="bench-row-score">{scoreBenchResult(r)}/50</span>
                         <span className={`history-chevron ${benchExpanded.has(i) ? "open" : ""}`}>{"\u25B6"}</span>
-                      </button>
-                      <button
-                        type="button"
-                        className={`bench-override-btn ${benchWinner === i ? "override-active" : ""}`}
-                        onClick={(e) => { e.stopPropagation(); overrideWinner(i); }}
-                        title={benchWinner === i ? "Current winner" : "Override: pick this as winner"}
-                        disabled={benchWinner === i}
-                      >
-                        {benchWinner === i ? "👑" : "Pick"}
                       </button>
                     </div>
                     {benchExpanded.has(i) && (
@@ -674,36 +636,37 @@ export default function ChatForm() {
         );
       })()}
       {benchRunCount > 0 && (() => {
+        const maxPossible = benchRunCount * 50;
         const sorted = BENCHMARK_THRESHOLDS
-          .map((t) => ({ threshold: t, wins: winTally[t] || 0 }))
-          .sort((a, b) => b.wins - a.wins);
-        const maxWins = sorted[0]?.wins || 1;
+          .map((t) => ({ threshold: t, score: scoreTally[t] || 0 }))
+          .sort((a, b) => b.score - a.score);
+        const topScore = sorted[0]?.score || 1;
 
         return (
           <div className="tally-panel">
             <div className="diagnostics-header">
               <span className="diagnostics-title">
-                Win Tally <span className="bench-progress">({benchRunCount}/{MAX_BENCH_RUNS} runs)</span>
+                Score Tally <span className="bench-progress">({benchRunCount}/{MAX_BENCH_RUNS} runs &middot; max {maxPossible})</span>
               </span>
               <button
                 type="button"
                 className="bench-clear"
-                onClick={() => { setWinTally({}); setBenchRunCount(0); }}
+                onClick={() => { setScoreTally({}); setBenchRunCount(0); }}
               >
                 Reset
               </button>
             </div>
             <div className="tally-rows">
               {sorted.map((entry) => (
-                <div key={entry.threshold} className={`tally-row ${entry.wins === maxWins && entry.wins > 0 ? "tally-leader" : ""}`}>
+                <div key={entry.threshold} className={`tally-row ${entry.score === topScore && entry.score > 0 ? "tally-leader" : ""}`}>
                   <span className="tally-threshold">{entry.threshold.toFixed(2)}</span>
                   <div className="tally-bar-track">
                     <div
                       className="tally-bar-fill"
-                      style={{ width: `${(entry.wins / maxWins) * 100}%` }}
+                      style={{ width: `${(entry.score / maxPossible) * 100}%` }}
                     />
                   </div>
-                  <span className="tally-count">{entry.wins}</span>
+                  <span className="tally-count">{entry.score}<span className="tally-max">/{maxPossible}</span></span>
                 </div>
               ))}
             </div>
