@@ -37,7 +37,8 @@ function getCorsHeaders(request: Request) {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
-    "Vary": "Origin", // Important for caching
+    "Access-Control-Expose-Headers": "X-Query-Id, X-Best-Score, X-Threshold, X-Low-Confidence, X-Result-Count, X-Strategy, X-Intent, X-Retrieval-Ms, X-Rerank-Ms",
+    "Vary": "Origin",
   };
 }
 
@@ -179,6 +180,7 @@ export async function POST(request: NextRequest) {
       : "gpt-5-mini";
     let userStrategy: UserStrategy = "auto";
     let strictMode = false;
+    let confidenceThreshold = LOW_CONFIDENCE_THRESHOLD;
 
     try {
       const body = await request.json();
@@ -199,6 +201,13 @@ export async function POST(request: NextRequest) {
       }
       if (typeof body?.strict === "boolean") {
         strictMode = body.strict;
+      }
+      if (
+        typeof body?.confidenceThreshold === "number" &&
+        body.confidenceThreshold >= 0 &&
+        body.confidenceThreshold <= 1
+      ) {
+        confidenceThreshold = body.confidenceThreshold;
       }
     } catch {
       return jsonResponse(
@@ -426,7 +435,7 @@ export async function POST(request: NextRequest) {
     const hasResults = finalResults.length > 0;
     const bestScore = hasResults ? topScores[0] : 0;
     const isLowConfidence =
-      !strictMode && (!hasResults || bestScore < LOW_CONFIDENCE_THRESHOLD);
+      !strictMode && (!hasResults || bestScore < confidenceThreshold);
 
     const context = hasResults
       ? finalResults
@@ -544,6 +553,14 @@ export async function POST(request: NextRequest) {
         ...getCorsHeaders(request),
         ...rateLimitHeaders,
         "X-Query-Id": queryId,
+        "X-Best-Score": bestScore.toFixed(4),
+        "X-Threshold": confidenceThreshold.toFixed(2),
+        "X-Low-Confidence": isLowConfidence.toString(),
+        "X-Result-Count": finalResults.length.toString(),
+        "X-Strategy": classified.strategy,
+        "X-Intent": classified.intent,
+        "X-Retrieval-Ms": retrievalMs.toString(),
+        "X-Rerank-Ms": rerankMs.toString(),
       },
     });
   } catch (error) {

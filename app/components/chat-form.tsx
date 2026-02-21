@@ -31,6 +31,17 @@ export default function ChatForm() {
   const [selectedModel, setSelectedModel] = useState<ModelId>("gpt-5.2");
   const [selectedStrategy, setSelectedStrategy] = useState<RetrievalStrategy>("auto");
   const [strictMode, setStrictMode] = useState(false);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(0.3);
+  const [diagnostics, setDiagnostics] = useState<{
+    bestScore: string;
+    threshold: string;
+    lowConfidence: string;
+    resultCount: string;
+    strategy: string;
+    intent: string;
+    retrievalMs: string;
+    rerankMs: string;
+  } | null>(null);
   const [rawResponse, setRawResponse] = useState("");
   const [copied, setCopied] = useState(false);
   const responseRef = useRef<HTMLDivElement>(null);
@@ -65,6 +76,7 @@ export default function ChatForm() {
     setMarkdown("");
     setRawResponse("");
     setCopied(false);
+    setDiagnostics(null);
 
     try {
       const res = await fetch("/api/chat", {
@@ -75,6 +87,7 @@ export default function ChatForm() {
           model: selectedModel,
           retrieval: selectedStrategy,
           strict: strictMode,
+          confidenceThreshold,
         }),
       });
 
@@ -84,6 +97,17 @@ export default function ChatForm() {
         setIsLoading(false);
         return;
       }
+
+      setDiagnostics({
+        bestScore: res.headers.get("X-Best-Score") || "—",
+        threshold: res.headers.get("X-Threshold") || "—",
+        lowConfidence: res.headers.get("X-Low-Confidence") || "—",
+        resultCount: res.headers.get("X-Result-Count") || "—",
+        strategy: res.headers.get("X-Strategy") || "—",
+        intent: res.headers.get("X-Intent") || "—",
+        retrievalMs: res.headers.get("X-Retrieval-Ms") || "—",
+        rerankMs: res.headers.get("X-Rerank-Ms") || "—",
+      });
 
       const reader = res.body?.getReader();
       if (!reader) {
@@ -213,6 +237,27 @@ export default function ChatForm() {
             <span className="toggle-slider" />
           </label>
         </div>
+        <div className="model-selector threshold-control">
+          <label htmlFor="threshold-slider" className="model-label">
+            Confidence <span className="threshold-value">{confidenceThreshold.toFixed(2)}</span>
+          </label>
+          <input
+            id="threshold-slider"
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value={confidenceThreshold}
+            onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value))}
+            disabled={isLoading || strictMode}
+            className="threshold-slider"
+            aria-label="Confidence threshold for general response fallback"
+          />
+          <div className="threshold-labels">
+            <span>Always docs</span>
+            <span>Always general</span>
+          </div>
+        </div>
       </div>
       <form className="chat-form" onSubmit={handleSubmit}>
         <input
@@ -257,6 +302,54 @@ export default function ChatForm() {
           <BlockRenderer blocks={blocks} />
         </div>
       </div>
+      {diagnostics && (
+        <div className="diagnostics-panel">
+          <div className="diagnostics-header">
+            <span className="diagnostics-title">Diagnostics</span>
+            <span className={`diagnostics-badge ${diagnostics.lowConfidence === "true" ? "badge-general" : "badge-docs"}`}>
+              {diagnostics.lowConfidence === "true" ? "General Response" : "Docs Response"}
+            </span>
+          </div>
+          <div className="diagnostics-grid">
+            <div className="diag-item">
+              <span className="diag-label">Best Score</span>
+              <span className="diag-value diag-score">{diagnostics.bestScore}</span>
+            </div>
+            <div className="diag-item">
+              <span className="diag-label">Threshold</span>
+              <span className="diag-value">{diagnostics.threshold}</span>
+            </div>
+            <div className="diag-item">
+              <span className="diag-label">Results</span>
+              <span className="diag-value">{diagnostics.resultCount}</span>
+            </div>
+            <div className="diag-item">
+              <span className="diag-label">Strategy</span>
+              <span className="diag-value">{diagnostics.strategy}</span>
+            </div>
+            <div className="diag-item">
+              <span className="diag-label">Intent</span>
+              <span className="diag-value">{diagnostics.intent}</span>
+            </div>
+            <div className="diag-item">
+              <span className="diag-label">Retrieval</span>
+              <span className="diag-value">{diagnostics.retrievalMs}ms</span>
+            </div>
+            <div className="diag-item">
+              <span className="diag-label">Rerank</span>
+              <span className="diag-value">{diagnostics.rerankMs}ms</span>
+            </div>
+            <div className="diag-item diag-verdict">
+              <span className="diag-label">Verdict</span>
+              <span className="diag-value">
+                {parseFloat(diagnostics.bestScore) >= parseFloat(diagnostics.threshold)
+                  ? `${diagnostics.bestScore} >= ${diagnostics.threshold} → Docs`
+                  : `${diagnostics.bestScore} < ${diagnostics.threshold} → General`}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
