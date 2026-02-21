@@ -26,7 +26,8 @@ type DiagSnapshot = {
   isDocsResponse: boolean;
 };
 
-const BENCHMARK_THRESHOLDS = [0.0, 0.25, 0.5, 0.75, 1.0] as const;
+const BENCHMARK_THRESHOLDS = [0.0, 0.33, 0.66, 1.0] as const;
+const MAX_BENCH_RUNS = 50;
 
 type BenchmarkResult = {
   threshold: number;
@@ -58,6 +59,9 @@ export default function ChatForm() {
   const [isBenchmarking, setIsBenchmarking] = useState(false);
   const [benchmarkProgress, setBenchmarkProgress] = useState(0);
   const [benchExpanded, setBenchExpanded] = useState<Set<number>>(new Set());
+  const [winTally, setWinTally] = useState<Record<number, number>>({});
+  const [benchRunCount, setBenchRunCount] = useState(0);
+  const [benchWinner, setBenchWinner] = useState<number | null>(null);
   const responseRef = useRef<HTMLDivElement>(null);
 
   const handleCopy = useCallback(async () => {
@@ -88,6 +92,7 @@ export default function ChatForm() {
     setBenchmarkProgress(0);
     setBenchmarkResults([]);
     setBenchExpanded(new Set());
+    setBenchWinner(null);
 
     const results: BenchmarkResult[] = [];
 
@@ -137,6 +142,14 @@ export default function ChatForm() {
 
     results.sort((a, b) => b.relevanceRank - a.relevanceRank || a.latencyMs - b.latencyMs);
     setBenchmarkResults(results);
+
+    if (results.length > 0) {
+      setBenchWinner(0);
+      const winner = results[0].threshold;
+      setWinTally((prev) => ({ ...prev, [winner]: (prev[winner] || 0) + 1 }));
+      setBenchRunCount((prev) => prev + 1);
+    }
+
     setIsBenchmarking(false);
   }, [message, isBenchmarking, isLoading, selectedStrategy]);
 
@@ -331,7 +344,7 @@ export default function ChatForm() {
         <button
           type="button"
           className={`bench-btn ${isBenchmarking ? "bench-active" : ""}`}
-          disabled={isLoading || isBenchmarking || !message.trim()}
+          disabled={isLoading || isBenchmarking || !message.trim() || benchRunCount >= MAX_BENCH_RUNS}
           onClick={handleBenchmark}
           title="Run query at 5 confidence thresholds and compare"
         >
@@ -487,6 +500,18 @@ export default function ChatForm() {
           }
         };
 
+        const overrideWinner = (idx: number) => {
+          if (benchWinner === null || benchWinner === idx) return;
+          const prevThreshold = benchmarkResults[benchWinner].threshold;
+          const newThreshold = benchmarkResults[idx].threshold;
+          setWinTally((prev) => ({
+            ...prev,
+            [prevThreshold]: Math.max(0, (prev[prevThreshold] || 0) - 1),
+            [newThreshold]: (prev[newThreshold] || 0) + 1,
+          }));
+          setBenchWinner(idx);
+        };
+
         return (
           <div className="benchmark-panel">
             <div className="diagnostics-header">
@@ -498,7 +523,7 @@ export default function ChatForm() {
                   <button type="button" className="bench-clear" onClick={toggleAll}>
                     {allExpanded ? "Collapse All" : "Expand All"}
                   </button>
-                  <button type="button" className="bench-clear" onClick={() => { setBenchmarkResults([]); setBenchExpanded(new Set()); }}>
+                  <button type="button" className="bench-clear" onClick={() => { setBenchmarkResults([]); setBenchExpanded(new Set()); setBenchWinner(null); }}>
                     Clear
                   </button>
                 </div>
@@ -515,20 +540,31 @@ export default function ChatForm() {
             {benchmarkResults.length > 0 && !isBenchmarking && (
               <div className="bench-results">
                 {benchmarkResults.map((r, i) => (
-                  <div key={r.threshold} className={`bench-row ${i === 0 ? "bench-best" : ""}`}>
-                    <button type="button" className="bench-row-header" onClick={() => toggleRow(i)}>
-                      <span className="bench-row-rank">#{i + 1}</span>
-                      <span className="bench-row-threshold">{r.threshold.toFixed(2)}</span>
-                      <span className="diag-rank" data-rank={r.relevanceRank}>
-                        {"★".repeat(r.relevanceRank)}{"☆".repeat(5 - r.relevanceRank)}
-                      </span>
-                      <span className="bench-row-meta">{r.strategy}</span>
-                      <span className="bench-row-meta">{r.latencyMs}ms</span>
-                      <span className={`diagnostics-badge ${r.isDocsResponse ? "badge-docs" : "badge-general"}`}>
-                        {r.isDocsResponse ? "Docs" : "General"}
-                      </span>
-                      <span className={`history-chevron ${benchExpanded.has(i) ? "open" : ""}`}>{"\u25B6"}</span>
-                    </button>
+                  <div key={r.threshold} className={`bench-row ${benchWinner === i ? "bench-best" : ""}`}>
+                    <div className="bench-row-header-wrap">
+                      <button type="button" className="bench-row-header" onClick={() => toggleRow(i)}>
+                        <span className="bench-row-rank">#{i + 1}</span>
+                        <span className="bench-row-threshold">{r.threshold.toFixed(2)}</span>
+                        <span className="diag-rank" data-rank={r.relevanceRank}>
+                          {"★".repeat(r.relevanceRank)}{"☆".repeat(5 - r.relevanceRank)}
+                        </span>
+                        <span className="bench-row-meta">{r.strategy}</span>
+                        <span className="bench-row-meta">{r.latencyMs}ms</span>
+                        <span className={`diagnostics-badge ${r.isDocsResponse ? "badge-docs" : "badge-general"}`}>
+                          {r.isDocsResponse ? "Docs" : "General"}
+                        </span>
+                        <span className={`history-chevron ${benchExpanded.has(i) ? "open" : ""}`}>{"\u25B6"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`bench-override-btn ${benchWinner === i ? "override-active" : ""}`}
+                        onClick={(e) => { e.stopPropagation(); overrideWinner(i); }}
+                        title={benchWinner === i ? "Current winner" : "Override: pick this as winner"}
+                        disabled={benchWinner === i}
+                      >
+                        {benchWinner === i ? "👑" : "Pick"}
+                      </button>
+                    </div>
                     {benchExpanded.has(i) && (
                       <div className="bench-row-response markdown-body">
                         <pre>{r.responseText || "(empty response)"}</pre>
@@ -537,6 +573,46 @@ export default function ChatForm() {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        );
+      })()}
+      {benchRunCount > 0 && (() => {
+        const sorted = BENCHMARK_THRESHOLDS
+          .map((t) => ({ threshold: t, wins: winTally[t] || 0 }))
+          .sort((a, b) => b.wins - a.wins);
+        const maxWins = sorted[0]?.wins || 1;
+
+        return (
+          <div className="tally-panel">
+            <div className="diagnostics-header">
+              <span className="diagnostics-title">
+                Win Tally <span className="bench-progress">({benchRunCount}/{MAX_BENCH_RUNS} runs)</span>
+              </span>
+              <button
+                type="button"
+                className="bench-clear"
+                onClick={() => { setWinTally({}); setBenchRunCount(0); }}
+              >
+                Reset
+              </button>
+            </div>
+            <div className="tally-rows">
+              {sorted.map((entry) => (
+                <div key={entry.threshold} className={`tally-row ${entry.wins === maxWins && entry.wins > 0 ? "tally-leader" : ""}`}>
+                  <span className="tally-threshold">{entry.threshold.toFixed(2)}</span>
+                  <div className="tally-bar-track">
+                    <div
+                      className="tally-bar-fill"
+                      style={{ width: `${(entry.wins / maxWins) * 100}%` }}
+                    />
+                  </div>
+                  <span className="tally-count">{entry.wins}</span>
+                </div>
+              ))}
+            </div>
+            {benchRunCount >= MAX_BENCH_RUNS && (
+              <div className="tally-cap">Limit reached ({MAX_BENCH_RUNS} runs). Reset to continue.</div>
             )}
           </div>
         );
