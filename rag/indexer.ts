@@ -7,6 +7,8 @@
 import { Embeddings } from "./embeddings";
 import { DocsStore, DocsChunk } from "./store-upstash";
 import { buildTermIndex, storeTermIndex } from "./bm25-searcher";
+import { readFileSync, readdirSync } from "fs";
+import { join } from "path";
 
 // Web Crypto API helpers for Edge Runtime compatibility
 async function sha256Hex(data: string): Promise<string> {
@@ -46,6 +48,7 @@ function timingSafeEqual(a: string, b: string): boolean {
 
 const DOCS_BASE_URL = "https://docs.openclaw.ai";
 const LLMS_FULL_URL = `${DOCS_BASE_URL}/llms-full.txt`;
+const SUPPLEMENTARY_DIR = join(process.cwd(), "docs");
 
 interface DocPage {
   url: string;
@@ -123,6 +126,57 @@ async function fetchDocsFromLlmsTxt(): Promise<DocPage[]> {
   }
 
   console.log(`Parsed ${pages.length} documentation pages from llms-full.txt`);
+  return pages;
+}
+
+/**
+ * Loads supplementary knowledge base files from the local docs/ directory.
+ * Files use the same format as llms-full.txt (# Title / Source: URL / content).
+ */
+function loadSupplementaryDocs(): DocPage[] {
+  const pages: DocPage[] = [];
+
+  let files: string[];
+  try {
+    files = readdirSync(SUPPLEMENTARY_DIR).filter((f) => f.endsWith(".md"));
+  } catch {
+    return pages;
+  }
+
+  for (const file of files) {
+    const content = readFileSync(join(SUPPLEMENTARY_DIR, file), "utf-8");
+    const sections = content.split(/\n(?=# [^\n]+\nSource:)/);
+
+    for (const section of sections) {
+      if (!section.trim()) continue;
+
+      const titleMatch = section.match(/^# ([^\n]+)/);
+      if (!titleMatch) continue;
+      const title = titleMatch[1].trim();
+
+      const sourceMatch = section.match(/\nSource: (https?:\/\/[^\n]+)/);
+      if (!sourceMatch) continue;
+      const url = sourceMatch[1].trim();
+
+      const urlObj = new URL(url);
+      const path = urlObj.pathname;
+
+      const contentStart = section.indexOf("\n", section.indexOf("Source:"));
+      if (contentStart === -1) continue;
+
+      let pageContent = section.slice(contentStart).trim();
+      pageContent = cleanMarkdown(pageContent);
+
+      if (pageContent.length < 50) continue;
+
+      pages.push({ url, path, title, content: pageContent });
+    }
+  }
+
+  if (pages.length > 0) {
+    console.log(`Loaded ${pages.length} supplementary knowledge pages from ${files.length} file(s)`);
+  }
+
   return pages;
 }
 
@@ -255,7 +309,12 @@ export async function indexDocs(): Promise<IndexResult> {
       };
     }
 
-    console.log(`Fetched ${pages.length} documentation pages`);
+
+    // Merge supplementary knowledge base (local docs/ directory)
+    const supplementary = loadSupplementaryDocs();
+    pages.push(...supplementary);
+
+    console.log(`Fetched ${pages.length - supplementary.length} documentation pages + ${supplementary.length} supplementary pages`);
 
     // Chunk all pages
     console.log("Chunking content...");

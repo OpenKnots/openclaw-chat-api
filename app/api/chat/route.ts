@@ -22,6 +22,7 @@ export const runtime = "edge";
 
 const MAX_MESSAGE_LENGTH = 2000;
 const ENABLE_HYBRID = process.env.ENABLE_HYBRID_SEARCH === "true";
+const LOW_CONFIDENCE_THRESHOLD = 0.3;
 
 const ALLOWED_ORIGINS = [
   "https://docs.openclaw.ai",
@@ -83,6 +84,35 @@ CONFIDENCE:
 
 DOCUMENTATION EXCERPTS:
 ${context}`;
+}
+
+/**
+ * Broader prompt used when retrieval confidence is low or no docs match.
+ * Allows general AI/agent knowledge while relating back to OpenClaw.
+ */
+function buildGeneralPrompt(context: string): string {
+  const contextBlock = context
+    ? `\n\nThe following documentation excerpts may be partially relevant — cite them with [Source Title](URL) if you use them:\n\n${context}`
+    : "";
+
+  return `You are an expert assistant for OpenClaw — an open-source AI agent framework.
+You have deep knowledge of AI, AI agents, LLMs, RAG, prompt engineering, and related topics.
+
+INSTRUCTIONS:
+1. Answer the user's question using your general knowledge of AI and AI agents
+2. Where relevant, explain how the topic relates to OpenClaw or how OpenClaw handles it
+3. If documentation excerpts are provided and relevant, cite them using [Source Title](URL) format
+4. Clearly distinguish between information from the docs and your general knowledge
+5. Be concise but complete
+6. If you are unsure about OpenClaw-specific details, say so rather than guessing
+
+SCOPE:
+- AI concepts, architectures, and best practices
+- AI agents, tool use, planning, and orchestration
+- LLMs, embeddings, RAG, vector databases
+- OpenClaw features, APIs, and workflows
+- Comparisons with other frameworks (when asked)
+- General software engineering in the context of AI applications${contextBlock}`;
 }
 
 export async function POST(request: NextRequest) {
@@ -356,45 +386,20 @@ export async function POST(request: NextRequest) {
       topScores = finalResults.map((r) => r.score);
     }
 
-    // Handle no results
-    if (finalResults.length === 0) {
-      // Log the failed query
-      logQueryAsync(queryId, {
-        timestamp: startTime,
-        query: trimmedMessage,
-        intent: classified.intent,
-        strategy: classified.strategy,
-        retrievalMs,
-        rerankMs,
-        totalMs: Date.now() - startTime,
-        resultCount: 0,
-        topChunkIds: [],
-        topScores: [],
-        model,
-        success: false,
-        errorMessage: "No results found",
-        clientIp,
-      });
+    // Build context and select prompt based on retrieval confidence
+    const hasResults = finalResults.length > 0;
+    const bestScore = hasResults ? topScores[0] : 0;
+    const isLowConfidence = !hasResults || bestScore < LOW_CONFIDENCE_THRESHOLD;
 
-      return new Response(
-        "I couldn't find relevant documentation excerpts for that question. Try rephrasing or search the docs.",
-        {
-          headers: {
-            "Content-Type": "text/plain",
-            ...getCorsHeaders(request),
-            ...rateLimitHeaders,
-            "X-Query-Id": queryId,
-          },
-        }
-      );
-    }
+    const context = hasResults
+      ? finalResults
+          .map((result) => `[${result.title}](${result.url})\n${result.content.slice(0, 1200)}`)
+          .join("\n\n---\n\n")
+      : "";
 
-    // Build context from retrieved chunks
-    const context = finalResults
-      .map((result) => `[${result.title}](${result.url})\n${result.content.slice(0, 1200)}`)
-      .join("\n\n---\n\n");
-
-    const systemPrompt = buildSystemPrompt(context);
+    const systemPrompt = isLowConfidence
+      ? buildGeneralPrompt(context)
+      : buildSystemPrompt(context);
 
     // Stream response from OpenAI
     const openaiResponse = await fetch(

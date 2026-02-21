@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { indexDocs, verifyGitHubSignature, isMainBranchPush } from "@/rag/indexer";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 // Store indexing status (note: in edge runtime, this won't persist across invocations)
 let indexingStatus = {
