@@ -284,6 +284,12 @@ export default function ChatForm() {
 
       pre.appendChild(btn);
     });
+
+    container.querySelectorAll<HTMLAnchorElement>("a[href]").forEach((a) => {
+      if (a.target) return;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+    });
   }, [blocks, isLoading]);
 
   return (

@@ -1028,10 +1028,16 @@ h1 {
 }
 
 .markdown-body a {
-  color: var(--text-primary);
+  color: rgb(96, 165, 250);
   text-decoration: underline;
-  text-underline-offset: 2px;
-  text-decoration-color: var(--text-muted);
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(96, 165, 250, 0.35);
+  transition: color 0.15s, text-decoration-color 0.15s;
+}
+
+.markdown-body a:hover {
+  color: rgb(147, 197, 253);
+  text-decoration-color: rgba(147, 197, 253, 0.6);
 }
 
 .markdown-body code {
