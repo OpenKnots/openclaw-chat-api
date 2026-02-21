@@ -571,6 +571,13 @@ h1 {
   transform: none;
 }
 
+.bench-btn.bench-active:disabled {
+  opacity: 1;
+  color: var(--text-primary);
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
 .benchmark-panel {
   margin-top: 0.75rem;
   padding: 0.75rem 1rem;

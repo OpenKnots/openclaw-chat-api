@@ -330,7 +330,7 @@ export default function ChatForm() {
         </button>
         <button
           type="button"
-          className="bench-btn"
+          className={`bench-btn ${isBenchmarking ? "bench-active" : ""}`}
           disabled={isLoading || isBenchmarking || !message.trim()}
           onClick={handleBenchmark}
           title="Run query at 5 confidence thresholds and compare"
