@@ -178,6 +178,7 @@ export async function POST(request: NextRequest) {
       ? defaultModel
       : "gpt-5-mini";
     let userStrategy: UserStrategy = "auto";
+    let strictMode = false;
 
     try {
       const body = await request.json();
@@ -195,6 +196,9 @@ export async function POST(request: NextRequest) {
         ALLOWED_STRATEGIES.includes(body.retrieval as UserStrategy)
       ) {
         userStrategy = body.retrieval as UserStrategy;
+      }
+      if (typeof body?.strict === "boolean") {
+        strictMode = body.strict;
       }
     } catch {
       return jsonResponse(
@@ -386,10 +390,43 @@ export async function POST(request: NextRequest) {
       topScores = finalResults.map((r) => r.score);
     }
 
-    // Build context and select prompt based on retrieval confidence
+    // Strict mode: docs-only, no fallback to general knowledge
+    if (strictMode && finalResults.length === 0) {
+      logQueryAsync(queryId, {
+        timestamp: startTime,
+        query: trimmedMessage,
+        intent: classified.intent,
+        strategy: classified.strategy,
+        retrievalMs,
+        rerankMs,
+        totalMs: Date.now() - startTime,
+        resultCount: 0,
+        topChunkIds: [],
+        topScores: [],
+        model,
+        success: false,
+        errorMessage: "No results found (strict mode)",
+        clientIp,
+      });
+
+      return new Response(
+        "I couldn't find relevant documentation excerpts for that question. Try rephrasing or search the docs.",
+        {
+          headers: {
+            "Content-Type": "text/plain",
+            ...getCorsHeaders(request),
+            ...rateLimitHeaders,
+            "X-Query-Id": queryId,
+          },
+        }
+      );
+    }
+
+    // Build context and select prompt based on retrieval confidence (unless strict)
     const hasResults = finalResults.length > 0;
     const bestScore = hasResults ? topScores[0] : 0;
-    const isLowConfidence = !hasResults || bestScore < LOW_CONFIDENCE_THRESHOLD;
+    const isLowConfidence =
+      !strictMode && (!hasResults || bestScore < LOW_CONFIDENCE_THRESHOLD);
 
     const context = hasResults
       ? finalResults

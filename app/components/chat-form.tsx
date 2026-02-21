@@ -30,6 +30,7 @@ export default function ChatForm() {
   const [isVisible, setIsVisible] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ModelId>("gpt-5.2");
   const [selectedStrategy, setSelectedStrategy] = useState<RetrievalStrategy>("auto");
+  const [strictMode, setStrictMode] = useState(false);
   const [rawResponse, setRawResponse] = useState("");
   const [copied, setCopied] = useState(false);
   const responseRef = useRef<HTMLDivElement>(null);
@@ -73,6 +74,7 @@ export default function ChatForm() {
           message: trimmedMessage,
           model: selectedModel,
           retrieval: selectedStrategy,
+          strict: strictMode,
         }),
       });
 
@@ -194,6 +196,22 @@ export default function ChatForm() {
               </option>
             ))}
           </select>
+        </div>
+        <div className="model-selector strict-toggle">
+          <label htmlFor="strict-toggle" className="model-label">
+            Strict
+          </label>
+          <label className="toggle-switch">
+            <input
+              id="strict-toggle"
+              type="checkbox"
+              checked={strictMode}
+              onChange={(e) => setStrictMode(e.target.checked)}
+              disabled={isLoading}
+              aria-label="Strict mode: docs only, no general knowledge"
+            />
+            <span className="toggle-slider" />
+          </label>
         </div>
       </div>
       <form className="chat-form" onSubmit={handleSubmit}>
