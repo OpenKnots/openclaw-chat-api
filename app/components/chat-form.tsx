@@ -70,6 +70,7 @@ export default function ChatForm() {
   const [benchRunCount, setBenchRunCount] = useState(0);
   const [benchWinner, setBenchWinner] = useState<number | null>(null);
   const [benchRegenerating, setBenchRegenerating] = useState<number | null>(null);
+  const [responseCollapsed, setResponseCollapsed] = useState(false);
   const responseRef = useRef<HTMLDivElement>(null);
 
   const handleCopy = useCallback(async () => {
@@ -178,6 +179,7 @@ export default function ChatForm() {
     setRawResponse("");
     setCopied(false);
     setDiagnostics(null);
+    setResponseCollapsed(false);
 
     try {
       const res = await fetch("/api/chat", {
@@ -375,34 +377,50 @@ export default function ChatForm() {
           )}
         </button>
       </form>
-      <div
-        ref={responseRef}
-        className={`response-area ${isVisible ? "visible" : ""} ${isLoading ? "loading" : ""}`}
-      >
-        {isVisible && rawResponse && !isLoading && (
-          <button
-            type="button"
-            className={`copy-btn ${copied ? "copied" : ""}`}
-            onClick={handleCopy}
-            aria-label={copied ? "Copied" : "Copy response"}
-            title={copied ? "Copied!" : "Copy"}
-          >
-            {copied ? (
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            ) : (
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-              </svg>
-            )}
-          </button>
-        )}
-        <div className="markdown-body">
-          <BlockRenderer blocks={blocks} />
+      {isVisible && (
+        <div className={`response-wrapper ${isLoading ? "loading" : ""}`}>
+          {rawResponse && !isLoading && (
+            <button
+              type="button"
+              className="response-toggle"
+              onClick={() => setResponseCollapsed((c) => !c)}
+            >
+              <span className="diagnostics-title">Response</span>
+              <span className={`history-chevron ${responseCollapsed ? "" : "open"}`}>{"\u25B6"}</span>
+            </button>
+          )}
+          {!responseCollapsed && (
+            <div
+              ref={responseRef}
+              className={`response-area visible ${isLoading ? "loading" : ""}`}
+            >
+              {rawResponse && !isLoading && (
+                <button
+                  type="button"
+                  className={`copy-btn ${copied ? "copied" : ""}`}
+                  onClick={handleCopy}
+                  aria-label={copied ? "Copied" : "Copy response"}
+                  title={copied ? "Copied!" : "Copy"}
+                >
+                  {copied ? (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  ) : (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                    </svg>
+                  )}
+                </button>
+              )}
+              <div className="markdown-body">
+                <BlockRenderer blocks={blocks} />
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      )}
       {diagnostics && (() => {
         const prev = history.length >= 2 ? history[history.length - 2] : null;
         const curRank = parseInt(diagnostics.relevanceRank, 10) || 0;

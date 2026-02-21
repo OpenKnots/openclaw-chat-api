@@ -926,21 +926,72 @@ h1 {
   transform: none;
 }
 
+.response-wrapper {
+  margin-top: 1.2rem;
+}
+
+.response-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.response-toggle:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+}
+
+.response-toggle .history-chevron {
+  margin-left: auto;
+}
+
 .response-area {
   position: relative;
-  margin-top: 1.2rem;
+  margin-top: 0;
   padding: 1.25rem 1.5rem;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
+  border-top: none;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
   display: none;
   min-height: 120px;
   max-height: 936px;
   overflow-y: auto;
 }
 
+.response-wrapper .response-toggle + .response-area {
+  border-top: none;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+}
+
+.response-wrapper .response-toggle {
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  margin-bottom: 0;
+}
+
+.response-wrapper .response-toggle:only-child {
+  border-radius: var(--radius-sm);
+}
+
 .response-area.visible {
   display: block;
+}
+
+.response-wrapper.loading .response-area {
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
 }
 
 .copy-btn {
