@@ -6,6 +6,7 @@ import { BlockRenderer, useMarkdown } from "@create-markdown/react";
 const MAX_MESSAGE_LENGTH = 2000;
 
 const MODEL = "gpt-5.2" as const;
+const BENCH_MODEL = "gpt-5-mini" as const;
 
 const RETRIEVAL_STRATEGIES = [
   { id: "auto", name: "Auto", description: "Query, Retrieval, Hybrid" },
@@ -36,6 +37,7 @@ type BenchmarkResult = {
   latencyMs: number;
   isDocsResponse: boolean;
   responseText: string;
+  model: string;
 };
 
 export default function ChatForm() {
@@ -62,6 +64,7 @@ export default function ChatForm() {
   const [winTally, setWinTally] = useState<Record<number, number>>({});
   const [benchRunCount, setBenchRunCount] = useState(0);
   const [benchWinner, setBenchWinner] = useState<number | null>(null);
+  const [benchRegenerating, setBenchRegenerating] = useState<number | null>(null);
   const responseRef = useRef<HTMLDivElement>(null);
 
   const handleCopy = useCallback(async () => {
@@ -106,7 +109,7 @@ export default function ChatForm() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             message: trimmedMessage,
-            model: MODEL,
+            model: BENCH_MODEL,
             retrieval: selectedStrategy,
             confidenceThreshold: threshold,
           }),
@@ -134,6 +137,7 @@ export default function ChatForm() {
           latencyMs: retrievalMs + rerankMs,
           isDocsResponse: res.headers.get("X-Low-Confidence") !== "true",
           responseText,
+          model: BENCH_MODEL,
         });
       } catch {
         // Skip failed requests
@@ -512,6 +516,50 @@ export default function ChatForm() {
           setBenchWinner(idx);
         };
 
+        const regenerateWith52 = async (idx: number) => {
+          const r = benchmarkResults[idx];
+          if (!r || benchRegenerating !== null) return;
+          setBenchRegenerating(idx);
+          try {
+            const res = await fetch("/api/chat", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                message: message.trim(),
+                model: MODEL,
+                retrieval: selectedStrategy,
+                confidenceThreshold: r.threshold,
+              }),
+            });
+            if (!res.ok) return;
+            const retrievalMs = parseInt(res.headers.get("X-Retrieval-Ms") || "0", 10);
+            const rerankMs = parseInt(res.headers.get("X-Rerank-Ms") || "0", 10);
+            let responseText = "";
+            const reader = res.body?.getReader();
+            if (reader) {
+              const decoder = new TextDecoder();
+              let chunk;
+              while (!(chunk = await reader.read()).done) {
+                responseText += decoder.decode(chunk.value, { stream: true });
+              }
+            }
+            const updated: BenchmarkResult = {
+              threshold: r.threshold,
+              relevanceRank: parseInt(res.headers.get("X-Relevance-Rank") || "0", 10),
+              strategy: res.headers.get("X-Strategy") || "—",
+              latencyMs: retrievalMs + rerankMs,
+              isDocsResponse: res.headers.get("X-Low-Confidence") !== "true",
+              responseText,
+              model: MODEL,
+            };
+            setBenchmarkResults((prev) => prev.map((item, j) => j === idx ? updated : item));
+          } catch {
+            // ignore
+          } finally {
+            setBenchRegenerating(null);
+          }
+        };
+
         return (
           <div className="benchmark-panel">
             <div className="diagnostics-header">
@@ -567,6 +615,20 @@ export default function ChatForm() {
                     </div>
                     {benchExpanded.has(i) && (
                       <div className="bench-row-response markdown-body">
+                        <div className="bench-response-toolbar">
+                          <span className="bench-model-tag">{r.model}</span>
+                          {r.model !== MODEL && (
+                            <button
+                              type="button"
+                              className="bench-regen-btn"
+                              disabled={benchRegenerating !== null}
+                              onClick={() => regenerateWith52(i)}
+                              title="Regenerate this result using GPT-5.2"
+                            >
+                              {benchRegenerating === i ? "..." : "5.2"}
+                            </button>
+                          )}
+                        </div>
                         <pre>{r.responseText || "(empty response)"}</pre>
                       </div>
                     )}

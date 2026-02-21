@@ -740,6 +740,47 @@ h1 {
   overflow-y: auto;
 }
 
+.bench-response-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.bench-model-tag {
+  font-size: 0.6rem;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  letter-spacing: 0.02em;
+}
+
+.bench-regen-btn {
+  font-size: 0.6rem;
+  font-family: var(--font-mono, monospace);
+  padding: 0.1rem 0.35rem;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  opacity: 0.6;
+}
+
+.bench-regen-btn:hover:not(:disabled) {
+  opacity: 1;
+  border-color: rgba(99, 102, 241, 0.3);
+  color: rgb(165, 180, 252);
+}
+
+.bench-regen-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.3;
+}
+
 .bench-row-response pre {
   margin: 0;
   padding: 0;
