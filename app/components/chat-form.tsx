@@ -40,6 +40,11 @@ type BenchmarkResult = {
   model: string;
 };
 
+function BenchmarkResponseBody({ text }: { text: string }) {
+  const { blocks } = useMarkdown(text || "(empty response)");
+  return <BlockRenderer blocks={blocks} />;
+}
+
 export default function ChatForm() {
   const [message, setMessage] = useState("");
   const { blocks, setMarkdown } = useMarkdown("");
@@ -97,12 +102,9 @@ export default function ChatForm() {
     setBenchExpanded(new Set());
     setBenchWinner(null);
 
-    const results: BenchmarkResult[] = [];
+    let completed = 0;
 
-    for (let i = 0; i < BENCHMARK_THRESHOLDS.length; i++) {
-      const threshold = BENCHMARK_THRESHOLDS[i];
-      setBenchmarkProgress(i + 1);
-
+    const promises = BENCHMARK_THRESHOLDS.map(async (threshold): Promise<BenchmarkResult | null> => {
       try {
         const res = await fetch("/api/chat", {
           method: "POST",
@@ -115,7 +117,7 @@ export default function ChatForm() {
           }),
         });
 
-        if (!res.ok) continue;
+        if (!res.ok) return null;
 
         const retrievalMs = parseInt(res.headers.get("X-Retrieval-Ms") || "0", 10);
         const rerankMs = parseInt(res.headers.get("X-Rerank-Ms") || "0", 10);
@@ -130,7 +132,10 @@ export default function ChatForm() {
           }
         }
 
-        results.push({
+        completed++;
+        setBenchmarkProgress(completed);
+
+        return {
           threshold,
           relevanceRank: parseInt(res.headers.get("X-Relevance-Rank") || "0", 10),
           strategy: res.headers.get("X-Strategy") || "—",
@@ -138,11 +143,16 @@ export default function ChatForm() {
           isDocsResponse: res.headers.get("X-Low-Confidence") !== "true",
           responseText,
           model: BENCH_MODEL,
-        });
+        };
       } catch {
-        // Skip failed requests
+        completed++;
+        setBenchmarkProgress(completed);
+        return null;
       }
-    }
+    });
+
+    const settled = await Promise.all(promises);
+    const results = settled.filter((r): r is BenchmarkResult => r !== null);
 
     results.sort((a, b) => b.relevanceRank - a.relevanceRank || a.latencyMs - b.latencyMs);
     setBenchmarkResults(results);
@@ -635,7 +645,7 @@ export default function ChatForm() {
                             </button>
                           )}
                         </div>
-                        <pre>{r.responseText || "(empty response)"}</pre>
+                        <BenchmarkResponseBody text={r.responseText} />
                       </div>
                     )}
                   </div>
