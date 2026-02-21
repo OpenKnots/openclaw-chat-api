@@ -5,13 +5,7 @@ import { BlockRenderer, useMarkdown } from "@create-markdown/react";
 
 const MAX_MESSAGE_LENGTH = 2000;
 
-const AVAILABLE_MODELS = [
-  { id: "gpt-5-nano", name: "GPT-5 nano", description: "Cheapest, Fastest, Efficient" },
-  { id: "gpt-5-mini", name: "GPT-5 mini", description: "Fast, Cost-efficient, Versatile" },
-  { id: "gpt-5", name: "GPT-5", description: "Reasoning, Coding, Agentic" },
-  { id: "gpt-5.1", name: "GPT-5.1", description: "Advanced, Reasoning, Agentic" },
-  { id: "gpt-5.2", name: "GPT-5.2", description: "Flagship, Coding, Agentic" },
-] as const;
+const MODEL = "gpt-5.2" as const;
 
 const RETRIEVAL_STRATEGIES = [
   { id: "auto", name: "Auto", description: "Query, Retrieval, Hybrid" },
@@ -20,7 +14,6 @@ const RETRIEVAL_STRATEGIES = [
   { id: "keyword", name: "Keyword", description: "Exact Match, Keywords, Keyword" },
 ] as const;
 
-type ModelId = (typeof AVAILABLE_MODELS)[number]["id"];
 type RetrievalStrategy = (typeof RETRIEVAL_STRATEGIES)[number]["id"];
 
 const MAX_HISTORY = 5;
@@ -33,12 +26,21 @@ type DiagSnapshot = {
   isDocsResponse: boolean;
 };
 
+const BENCHMARK_THRESHOLDS = [0.0, 0.25, 0.5, 0.75, 1.0] as const;
+
+type BenchmarkResult = {
+  threshold: number;
+  relevanceRank: number;
+  strategy: string;
+  latencyMs: number;
+  isDocsResponse: boolean;
+};
+
 export default function ChatForm() {
   const [message, setMessage] = useState("");
   const { blocks, setMarkdown } = useMarkdown("");
   const [isLoading, setIsLoading] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<ModelId>("gpt-5.2");
   const [selectedStrategy, setSelectedStrategy] = useState<RetrievalStrategy>("auto");
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.3);
   const [diagnostics, setDiagnostics] = useState<{
@@ -51,6 +53,9 @@ export default function ChatForm() {
   const [copied, setCopied] = useState(false);
   const [history, setHistory] = useState<DiagSnapshot[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [benchmarkResults, setBenchmarkResults] = useState<BenchmarkResult[]>([]);
+  const [isBenchmarking, setIsBenchmarking] = useState(false);
+  const [benchmarkProgress, setBenchmarkProgress] = useState(0);
   const responseRef = useRef<HTMLDivElement>(null);
 
   const handleCopy = useCallback(async () => {
@@ -73,6 +78,60 @@ export default function ChatForm() {
     }
   }, [rawResponse, copied]);
 
+  const handleBenchmark = useCallback(async () => {
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage || isBenchmarking || isLoading) return;
+
+    setIsBenchmarking(true);
+    setBenchmarkProgress(0);
+    setBenchmarkResults([]);
+
+    const results: BenchmarkResult[] = [];
+
+    for (let i = 0; i < BENCHMARK_THRESHOLDS.length; i++) {
+      const threshold = BENCHMARK_THRESHOLDS[i];
+      setBenchmarkProgress(i + 1);
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: trimmedMessage,
+            model: MODEL,
+            retrieval: selectedStrategy,
+            confidenceThreshold: threshold,
+          }),
+        });
+
+        if (!res.ok) continue;
+
+        const retrievalMs = parseInt(res.headers.get("X-Retrieval-Ms") || "0", 10);
+        const rerankMs = parseInt(res.headers.get("X-Rerank-Ms") || "0", 10);
+
+        results.push({
+          threshold,
+          relevanceRank: parseInt(res.headers.get("X-Relevance-Rank") || "0", 10),
+          strategy: res.headers.get("X-Strategy") || "—",
+          latencyMs: retrievalMs + rerankMs,
+          isDocsResponse: res.headers.get("X-Low-Confidence") !== "true",
+        });
+
+        // Drain the stream so the request completes
+        const reader = res.body?.getReader();
+        if (reader) {
+          while (!(await reader.read()).done) { /* drain */ }
+        }
+      } catch {
+        // Skip failed requests
+      }
+    }
+
+    results.sort((a, b) => b.relevanceRank - a.relevanceRank || a.latencyMs - b.latencyMs);
+    setBenchmarkResults(results);
+    setIsBenchmarking(false);
+  }, [message, isBenchmarking, isLoading, selectedStrategy]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedMessage = message.trim();
@@ -91,7 +150,7 @@ export default function ChatForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: trimmedMessage,
-          model: selectedModel,
+          model: MODEL,
           retrieval: selectedStrategy,
           confidenceThreshold,
         }),
@@ -202,29 +261,9 @@ export default function ChatForm() {
     });
   }, [blocks, isLoading]);
 
-  const currentModel = AVAILABLE_MODELS.find((m) => m.id === selectedModel);
-
   return (
     <>
       <div className="selectors-row">
-        <div className="model-selector">
-          <label htmlFor="model-select" className="model-label">
-            Model
-          </label>
-          <select
-            id="model-select"
-            className="model-select"
-            value={selectedModel}
-            onChange={(e) => setSelectedModel(e.target.value as ModelId)}
-            disabled={isLoading}
-          >
-            {AVAILABLE_MODELS.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.name} ({model.description})
-              </option>
-            ))}
-          </select>
-        </div>
         <div className="model-selector">
           <label htmlFor="strategy-select" className="model-label">
             Search
@@ -276,8 +315,21 @@ export default function ChatForm() {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
         />
-        <button type="submit" className="chat-btn" disabled={isLoading}>
-          {isLoading ? `${currentModel?.name}...` : <>Ask Molty <img src="/logo.svg" alt="" width={20} height={20} className="btn-logo" /></>}
+        <button type="submit" className="chat-btn" disabled={isLoading || isBenchmarking}>
+          {isLoading ? "GPT-5.2..." : <>Ask Molty <img src="/logo.svg" alt="" width={20} height={20} className="btn-logo" /></>}
+        </button>
+        <button
+          type="button"
+          className="bench-btn"
+          disabled={isLoading || isBenchmarking || !message.trim()}
+          onClick={handleBenchmark}
+          title="Run query at 5 confidence thresholds and compare"
+        >
+          {isBenchmarking ? (
+            <>{benchmarkProgress}/{BENCHMARK_THRESHOLDS.length}</>
+          ) : (
+            <>Bench</>
+          )}
         </button>
       </form>
       <div
@@ -405,6 +457,66 @@ export default function ChatForm() {
           </div>
         );
       })()}
+      {(isBenchmarking || benchmarkResults.length > 0) && (
+        <div className="benchmark-panel">
+          <div className="diagnostics-header">
+            <span className="diagnostics-title">
+              Benchmark {isBenchmarking && <span className="bench-progress">({benchmarkProgress}/{BENCHMARK_THRESHOLDS.length})</span>}
+            </span>
+            {benchmarkResults.length > 0 && !isBenchmarking && (
+              <button
+                type="button"
+                className="bench-clear"
+                onClick={() => setBenchmarkResults([])}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          {isBenchmarking && (
+            <div className="bench-progress-bar">
+              <div
+                className="bench-progress-fill"
+                style={{ width: `${(benchmarkProgress / BENCHMARK_THRESHOLDS.length) * 100}%` }}
+              />
+            </div>
+          )}
+          {benchmarkResults.length > 0 && !isBenchmarking && (
+            <table className="history-table">
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Threshold</th>
+                  <th>Relevance</th>
+                  <th>Strategy</th>
+                  <th>Latency</th>
+                  <th>Type</th>
+                </tr>
+              </thead>
+              <tbody>
+                {benchmarkResults.map((r, i) => (
+                  <tr key={r.threshold} className={i === 0 ? "bench-best" : ""}>
+                    <td>{i + 1}</td>
+                    <td>{r.threshold.toFixed(2)}</td>
+                    <td>
+                      <span className="diag-rank" data-rank={r.relevanceRank}>
+                        {"★".repeat(r.relevanceRank)}{"☆".repeat(5 - r.relevanceRank)}
+                      </span>
+                    </td>
+                    <td>{r.strategy}</td>
+                    <td>{r.latencyMs}ms</td>
+                    <td>
+                      <span className={`diagnostics-badge ${r.isDocsResponse ? "badge-docs" : "badge-general"}`}>
+                        {r.isDocsResponse ? "Docs" : "General"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
     </>
   );
 }

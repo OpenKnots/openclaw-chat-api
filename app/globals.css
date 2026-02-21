@@ -211,7 +211,7 @@ h1 {
 
 .selectors-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 1rem;
   margin-bottom: 1rem;
   align-items: center;
@@ -539,6 +539,88 @@ h1 {
 .history-table .diagnostics-badge {
   font-size: 0.55rem;
   padding: 0.1rem 0.35rem;
+}
+
+/* ── Benchmark ── */
+
+.bench-btn {
+  padding: 0.875rem 0.75rem;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: var(--radius-sm);
+  background: rgba(59, 130, 246, 0.08);
+  color: rgba(59, 130, 246, 0.9);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s, transform 0.15s;
+  white-space: nowrap;
+  font-family: var(--font-mono, monospace);
+}
+
+.bench-btn:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.4);
+  transform: translateY(-1px);
+}
+
+.bench-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.benchmark-panel {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-family: var(--font-mono, monospace);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.bench-progress {
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.bench-clear {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.6rem;
+  font-family: var(--font-mono, monospace);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.bench-clear:hover {
+  color: var(--text-secondary);
+}
+
+.bench-progress-bar {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  margin-top: 0.5rem;
+  overflow: hidden;
+}
+
+.bench-progress-fill {
+  height: 100%;
+  background: rgba(59, 130, 246, 0.7);
+  border-radius: 2px;
+  transition: width 0.3s ease-out;
+}
+
+.bench-best td {
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .chat-form {
