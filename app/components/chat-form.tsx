@@ -48,6 +48,7 @@ export default function ChatForm() {
     lowConfidence: string;
     strategy: string;
     latencyMs: string;
+    confidenceThreshold: number;
   } | null>(null);
   const [rawResponse, setRawResponse] = useState("");
   const [copied, setCopied] = useState(false);
@@ -90,18 +91,96 @@ export default function ChatForm() {
     return Math.round(Math.min(50, relevance + docs + speed));
   }, []);
 
+  const runDiagnosticQuery = useCallback(async (query: string) => {
+    const usedThreshold = confidenceThreshold;
+    setIsVisible(true);
+    setMarkdown("");
+    setRawResponse("");
+    setCopied(false);
+    setDiagnostics(null);
+    setResponseCollapsed(false);
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: query,
+          model: MODEL,
+          retrieval: "auto",
+          confidenceThreshold: usedThreshold,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        setMarkdown(`Error: ${err.error || "Unknown error"}`);
+        return;
+      }
+
+      const retrievalMs = parseInt(res.headers.get("X-Retrieval-Ms") || "0", 10);
+      const rerankMs = parseInt(res.headers.get("X-Rerank-Ms") || "0", 10);
+      const relevanceRankStr = res.headers.get("X-Relevance-Rank") || "—";
+      const lowConfStr = res.headers.get("X-Low-Confidence") || "—";
+      const strategyStr = res.headers.get("X-Strategy") || "—";
+      const totalLatency = retrievalMs + rerankMs;
+
+      setDiagnostics({
+        relevanceRank: relevanceRankStr,
+        lowConfidence: lowConfStr,
+        strategy: strategyStr,
+        latencyMs: totalLatency.toString(),
+        confidenceThreshold: usedThreshold,
+      });
+
+      setHistory((prev) => {
+        const snapshot: DiagSnapshot = {
+          query: query.length > 40 ? query.slice(0, 37) + "..." : query,
+          relevanceRank: parseInt(relevanceRankStr, 10) || 0,
+          strategy: strategyStr,
+          latencyMs: totalLatency,
+          isDocsResponse: lowConfStr !== "true",
+        };
+        const next = [...prev, snapshot];
+        return next.length > MAX_HISTORY ? next.slice(next.length - MAX_HISTORY) : next;
+      });
+
+      const reader = res.body?.getReader();
+      if (!reader) {
+        setMarkdown("Error: No response body");
+        return;
+      }
+
+      const decoder = new TextDecoder();
+      let rawText = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        rawText += decoder.decode(value, { stream: true });
+        setMarkdown(rawText);
+        setRawResponse(rawText);
+        if (responseRef.current) {
+          responseRef.current.scrollTop = responseRef.current.scrollHeight;
+        }
+      }
+    } catch (err) {
+      setMarkdown(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);
+    }
+  }, [confidenceThreshold, setMarkdown]);
+
   const handleBenchmark = useCallback(async () => {
     const trimmedMessage = message.trim();
     if (!trimmedMessage || isBenchmarking || isLoading) return;
 
     setIsBenchmarking(true);
+    setIsLoading(true);
     setBenchmarkProgress(0);
     setBenchmarkResults([]);
     setBenchExpanded(new Set());
 
     let completed = 0;
 
-    const promises = BENCHMARK_THRESHOLDS.map(async (threshold): Promise<BenchmarkResult | null> => {
+    const benchPromises = BENCHMARK_THRESHOLDS.map(async (threshold): Promise<BenchmarkResult | null> => {
       try {
         const res = await fetch("/api/chat", {
           method: "POST",
@@ -148,7 +227,9 @@ export default function ChatForm() {
       }
     });
 
-    const settled = await Promise.all(promises);
+    const diagPromise = runDiagnosticQuery(trimmedMessage);
+
+    const [settled] = await Promise.all([Promise.all(benchPromises), diagPromise]);
     const results = settled.filter((r): r is BenchmarkResult => r !== null);
 
     results.sort((a, b) => b.relevanceRank - a.relevanceRank || a.latencyMs - b.latencyMs);
@@ -166,7 +247,8 @@ export default function ChatForm() {
     }
 
     setIsBenchmarking(false);
-  }, [message, isBenchmarking, isLoading, scoreBenchResult]);
+    setIsLoading(false);
+  }, [message, isBenchmarking, isLoading, scoreBenchResult, runDiagnosticQuery]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,84 +256,8 @@ export default function ChatForm() {
     if (!trimmedMessage) return;
 
     setIsLoading(true);
-    setIsVisible(true);
-    setMarkdown("");
-    setRawResponse("");
-    setCopied(false);
-    setDiagnostics(null);
-    setResponseCollapsed(false);
-
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: trimmedMessage,
-          model: MODEL,
-          retrieval: "auto",
-          confidenceThreshold,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        setMarkdown(`Error: ${err.error || "Unknown error"}`);
-        setIsLoading(false);
-        return;
-      }
-
-      const retrievalMs = parseInt(res.headers.get("X-Retrieval-Ms") || "0", 10);
-      const rerankMs = parseInt(res.headers.get("X-Rerank-Ms") || "0", 10);
-
-      const relevanceRankStr = res.headers.get("X-Relevance-Rank") || "—";
-      const lowConfStr = res.headers.get("X-Low-Confidence") || "—";
-      const strategyStr = res.headers.get("X-Strategy") || "—";
-      const totalLatency = retrievalMs + rerankMs;
-
-      setDiagnostics({
-        relevanceRank: relevanceRankStr,
-        lowConfidence: lowConfStr,
-        strategy: strategyStr,
-        latencyMs: totalLatency.toString(),
-      });
-
-      setHistory((prev) => {
-        const snapshot: DiagSnapshot = {
-          query: trimmedMessage.length > 40 ? trimmedMessage.slice(0, 37) + "..." : trimmedMessage,
-          relevanceRank: parseInt(relevanceRankStr, 10) || 0,
-          strategy: strategyStr,
-          latencyMs: totalLatency,
-          isDocsResponse: lowConfStr !== "true",
-        };
-        const next = [...prev, snapshot];
-        return next.length > MAX_HISTORY ? next.slice(next.length - MAX_HISTORY) : next;
-      });
-
-      const reader = res.body?.getReader();
-      if (!reader) {
-        setMarkdown("Error: No response body");
-        setIsLoading(false);
-        return;
-      }
-
-      const decoder = new TextDecoder();
-      let rawText = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        rawText += decoder.decode(value, { stream: true });
-        setMarkdown(rawText);
-        setRawResponse(rawText);
-        if (responseRef.current) {
-          responseRef.current.scrollTop = responseRef.current.scrollHeight;
-        }
-      }
-    } catch (err) {
-      setMarkdown(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);
-    } finally {
-      setIsLoading(false);
-    }
+    await runDiagnosticQuery(trimmedMessage);
+    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -306,31 +312,29 @@ export default function ChatForm() {
 
   return (
     <>
-      {!isBenchmarking && benchmarkResults.length === 0 && (
-        <div className="selectors-row">
-          <div className="model-selector threshold-control">
-            <label htmlFor="threshold-slider" className="model-label">
-              Confidence <span className="threshold-value">{confidenceThreshold.toFixed(2)}</span>
-            </label>
-            <input
-              id="threshold-slider"
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={confidenceThreshold}
-              onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value))}
-              disabled={isLoading}
-              className="threshold-slider"
-              aria-label="Confidence threshold for general response fallback"
-            />
-            <div className="threshold-labels">
-              <span>Always docs</span>
-              <span>Always general</span>
-            </div>
+      <div className="selectors-row">
+        <div className="model-selector threshold-control">
+          <label htmlFor="threshold-slider" className="model-label">
+            Confidence <span className="threshold-value">{confidenceThreshold.toFixed(2)}</span>
+          </label>
+          <input
+            id="threshold-slider"
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value={confidenceThreshold}
+            onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value))}
+            disabled={isLoading || isBenchmarking}
+            className="threshold-slider"
+            aria-label="Confidence threshold for general response fallback"
+          />
+          <div className="threshold-labels">
+            <span>Always docs</span>
+            <span>Always general</span>
           </div>
         </div>
-      )}
+      </div>
       <form className="chat-form" onSubmit={handleSubmit}>
         <input
           type="text"
@@ -438,6 +442,10 @@ export default function ChatForm() {
                     </span>
                   )}
                 </span>
+              </div>
+              <div className="diag-item">
+                <span className="diag-label">Threshold</span>
+                <span className="diag-value">{diagnostics.confidenceThreshold.toFixed(2)}</span>
               </div>
               <div className="diag-item">
                 <span className="diag-label">Strategy</span>
