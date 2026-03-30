@@ -17,8 +17,12 @@ const EMBEDDING_DIMENSIONS: Record<string, number> = {
   "text-embedding-004": 768,
 };
 
-// Gemini REST API batch limit is 100 texts per request
-const MAX_BATCH_SIZE = 100;
+// Gemini free tier: 100 embed requests per minute per project
+// Each batchEmbedContents call counts as 1 request per text in the batch.
+// To stay within the free tier: send batches of 50 with a 35s delay between batches.
+// This is conservative — upgrade to paid tier to remove the delay.
+const MAX_BATCH_SIZE = 50;
+const BATCH_DELAY_MS = 35_000; // 35s between batches (~80 req/min, safely under 100)
 
 const GEMINI_EMBED_BASE =
   "https://generativelanguage.googleapis.com/v1beta/models";
@@ -76,6 +80,11 @@ export class Embeddings {
     const results: number[][] = [];
 
     for (let i = 0; i < texts.length; i += MAX_BATCH_SIZE) {
+      // Rate-limit: wait between batches to respect Gemini free tier quota
+      if (i > 0) {
+        await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY_MS));
+      }
+
       const batch = texts.slice(i, i + MAX_BATCH_SIZE);
 
       // Gemini batchEmbedContents endpoint
