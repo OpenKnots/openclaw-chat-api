@@ -278,14 +278,14 @@ export async function indexDocs(): Promise<IndexResult> {
   console.log("Starting documentation indexing...");
 
   // Validate environment
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return {
       success: false,
       pagesProcessed: 0,
       chunksCreated: 0,
       uniqueTerms: 0,
-      errors: ["OPENAI_API_KEY is required"],
+      errors: ["GEMINI_API_KEY is required"],
       duration: Date.now() - startTime,
     };
   }

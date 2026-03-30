@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate environment
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return jsonResponse(
         request,
