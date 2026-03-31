@@ -151,8 +151,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate environment
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const openaiKey = process.env.OPENAI_API_KEY;
+    if (!geminiKey || !openaiKey) {
       return jsonResponse(
         request,
         { error: "Server configuration error", status: 500 },
@@ -253,7 +254,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Initialize RAG components
-    const embeddings = new Embeddings(apiKey);
+    const embeddings = new Embeddings(geminiKey);
     const store = new DocsStore();
     const retriever = new Retriever(store, embeddings);
 
@@ -422,7 +423,7 @@ export async function POST(request: NextRequest) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${openaiKey}`,
         },
         body: JSON.stringify({
           model,
